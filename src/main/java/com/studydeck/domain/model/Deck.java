@@ -2,6 +2,8 @@ package com.studydeck.domain.model;
 
 import com.studydeck.domain.exception.DomainValidationException;
 import java.time.Instant;
+import java.util.Collections;
+import java.util.List;
 import java.util.Objects;
 
 /**
@@ -10,8 +12,10 @@ import java.util.Objects;
  * <p>Invariants:
  *
  * <ul>
- *   <li>name: non-blank, 1–200 characters
- *   <li>visibility: defaults to PRIVATE
+ *   <li>title: non-blank, 1–120 characters (OpenAPI contract)
+ *   <li>description: optional, max 1000 characters
+ *   <li>tags: immutable list; null input → empty list
+ *   <li>defaultDesiredRetention: 0.70–0.99 inclusive, default 0.9
  *   <li>archived: defaults to false; archive() transitions to true
  * </ul>
  *
@@ -19,29 +23,39 @@ import java.util.Objects;
  */
 public final class Deck {
 
+  private static final double DEFAULT_RETENTION = 0.9;
+  private static final double MIN_RETENTION = 0.70;
+  private static final double MAX_RETENTION = 0.99;
+
   private final DeckId id;
   private final OwnerId ownerId;
-  private String name;
+  private String title;
   private String description;
-  private Visibility visibility;
+  private List<String> tags;
+  private double defaultDesiredRetention;
   private boolean archived;
   private final Instant createdAt;
+  private Instant updatedAt;
 
   private Deck(
       DeckId id,
       OwnerId ownerId,
-      String name,
+      String title,
       String description,
-      Visibility visibility,
+      List<String> tags,
+      double defaultDesiredRetention,
       boolean archived,
-      Instant createdAt) {
+      Instant createdAt,
+      Instant updatedAt) {
     this.id = id;
     this.ownerId = ownerId;
-    this.name = name;
+    this.title = title;
     this.description = description;
-    this.visibility = visibility;
+    this.tags = tags;
+    this.defaultDesiredRetention = defaultDesiredRetention;
     this.archived = archived;
     this.createdAt = createdAt;
+    this.updatedAt = updatedAt;
   }
 
   /**
@@ -49,30 +63,70 @@ public final class Deck {
    *
    * @param id non-null deck id
    * @param ownerId non-null owner id
-   * @param name non-blank, max 200 chars
-   * @param description optional, may be null
+   * @param title non-blank, max 120 chars
+   * @param description optional, may be null, max 1000 chars
+   * @param tags optional, may be null (defaults to empty list)
+   * @param defaultDesiredRetention between 0.70 and 0.99 inclusive; use {@code 0.9} as default
    */
-  public static Deck create(DeckId id, OwnerId ownerId, String name, String description) {
+  public static Deck create(
+      DeckId id,
+      OwnerId ownerId,
+      String title,
+      String description,
+      List<String> tags,
+      double defaultDesiredRetention) {
     Objects.requireNonNull(id, "Deck id must not be null");
     Objects.requireNonNull(ownerId, "Deck ownerId must not be null");
-    validateName(name);
-    return new Deck(id, ownerId, name, description, Visibility.PRIVATE, false, Instant.now());
+    validateTitle(title);
+    validateDescription(description);
+    validateRetention(defaultDesiredRetention);
+    List<String> safeTags = (tags == null) ? List.of() : List.copyOf(tags);
+    Instant now = Instant.now();
+    return new Deck(
+        id, ownerId, title, description, safeTags, defaultDesiredRetention, false, now, now);
+  }
+
+  /**
+   * Convenience factory using default retention (0.9) and no tags.
+   *
+   * @param id non-null deck id
+   * @param ownerId non-null owner id
+   * @param title non-blank, max 120 chars
+   * @param description optional, may be null
+   */
+  public static Deck create(DeckId id, OwnerId ownerId, String title, String description) {
+    return create(id, ownerId, title, description, null, DEFAULT_RETENTION);
   }
 
   /** Reconstitution constructor for persistence adapters (package-private by convention). */
   public static Deck reconstitute(
       DeckId id,
       OwnerId ownerId,
-      String name,
+      String title,
       String description,
-      Visibility visibility,
+      List<String> tags,
+      double defaultDesiredRetention,
       boolean archived,
-      Instant createdAt) {
+      Instant createdAt,
+      Instant updatedAt) {
     Objects.requireNonNull(id, "Deck id must not be null");
     Objects.requireNonNull(ownerId, "Deck ownerId must not be null");
-    validateName(name);
+    validateTitle(title);
+    validateDescription(description);
+    validateRetention(defaultDesiredRetention);
     Objects.requireNonNull(createdAt, "Deck createdAt must not be null");
-    return new Deck(id, ownerId, name, description, visibility, archived, createdAt);
+    Objects.requireNonNull(updatedAt, "Deck updatedAt must not be null");
+    List<String> safeTags = (tags == null) ? List.of() : List.copyOf(tags);
+    return new Deck(
+        id,
+        ownerId,
+        title,
+        description,
+        safeTags,
+        defaultDesiredRetention,
+        archived,
+        createdAt,
+        updatedAt);
   }
 
   // ---------------------------------------------------------------
@@ -82,17 +136,41 @@ public final class Deck {
   /** Archives this deck. Idempotent — calling more than once has no additional effect. */
   public void archive() {
     this.archived = true;
+    this.updatedAt = Instant.now();
   }
 
-  /** Updates name. Enforces the same invariants as creation. */
-  public void rename(String newName) {
-    validateName(newName);
-    this.name = newName;
+  /**
+   * Updates the deck's mutable fields: title, description, tags, and retention.
+   *
+   * @param newTitle non-blank, max 120 chars
+   * @param newDescription optional, may be null
+   * @param newTags optional, null → empty list
+   * @param newRetention 0.70–0.99 inclusive
+   */
+  public void update(
+      String newTitle, String newDescription, List<String> newTags, double newRetention) {
+    validateTitle(newTitle);
+    validateDescription(newDescription);
+    validateRetention(newRetention);
+    this.title = newTitle;
+    this.description = newDescription;
+    this.tags = (newTags == null) ? List.of() : List.copyOf(newTags);
+    this.defaultDesiredRetention = newRetention;
+    this.updatedAt = Instant.now();
+  }
+
+  /** Updates title only. Enforces the same invariants as creation. */
+  public void retitle(String newTitle) {
+    validateTitle(newTitle);
+    this.title = newTitle;
+    this.updatedAt = Instant.now();
   }
 
   /** Updates description. Null is allowed. */
   public void updateDescription(String description) {
+    validateDescription(description);
     this.description = description;
+    this.updatedAt = Instant.now();
   }
 
   // ---------------------------------------------------------------
@@ -107,16 +185,20 @@ public final class Deck {
     return ownerId;
   }
 
-  public String getName() {
-    return name;
+  public String getTitle() {
+    return title;
   }
 
   public String getDescription() {
     return description;
   }
 
-  public Visibility getVisibility() {
-    return visibility;
+  public List<String> getTags() {
+    return Collections.unmodifiableList(tags);
+  }
+
+  public double getDefaultDesiredRetention() {
+    return defaultDesiredRetention;
   }
 
   public boolean isArchived() {
@@ -127,17 +209,36 @@ public final class Deck {
     return createdAt;
   }
 
+  public Instant getUpdatedAt() {
+    return updatedAt;
+  }
+
   // ---------------------------------------------------------------
   // Invariant helpers
   // ---------------------------------------------------------------
 
-  private static void validateName(String name) {
-    if (name == null || name.isBlank()) {
-      throw new DomainValidationException("name", "must not be null or blank");
+  private static void validateTitle(String title) {
+    if (title == null || title.isBlank()) {
+      throw new DomainValidationException("title", "must not be null or blank");
     }
-    if (name.length() > 200) {
+    if (title.length() > 120) {
       throw new DomainValidationException(
-          "name", "exceeds 200 character limit (got %d)".formatted(name.length()));
+          "title", "exceeds 120 character limit (got %d)".formatted(title.length()));
+    }
+  }
+
+  private static void validateDescription(String description) {
+    if (description != null && description.length() > 1000) {
+      throw new DomainValidationException(
+          "description", "exceeds 1000 character limit (got %d)".formatted(description.length()));
+    }
+  }
+
+  private static void validateRetention(double retention) {
+    if (retention < MIN_RETENTION || retention > MAX_RETENTION) {
+      throw new DomainValidationException(
+          "defaultDesiredRetention",
+          "must be between 0.70 and 0.99 inclusive (got %s)".formatted(retention));
     }
   }
 }

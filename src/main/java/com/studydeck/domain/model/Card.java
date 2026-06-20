@@ -89,6 +89,48 @@ public final class Card {
         Instant.now());
   }
 
+  /**
+   * Reconstitution constructor for persistence adapters.
+   *
+   * @param id unique card id
+   * @param noteId the note this card derives from
+   * @param noteType the note type (copied from the Note)
+   * @param cardVariant variant name: "forward", "reverse", "cloze-N", "mcq", "free-text"
+   * @param ordinal 0-based position within sibling cards
+   * @param promptPayload typed prompt (non-null)
+   * @param answerPayload typed answer (non-null)
+   * @param suspended whether the card is suspended
+   * @param createdAt original creation timestamp
+   */
+  public static Card reconstitute(
+      CardId id,
+      NoteId noteId,
+      NoteType noteType,
+      String cardVariant,
+      int ordinal,
+      CardPayload promptPayload,
+      CardPayload answerPayload,
+      boolean suspended,
+      Instant createdAt) {
+    Objects.requireNonNull(id, "Card id must not be null");
+    Objects.requireNonNull(noteId, "Card noteId must not be null");
+    Objects.requireNonNull(noteType, "Card noteType must not be null");
+    Objects.requireNonNull(cardVariant, "Card cardVariant must not be null");
+    Objects.requireNonNull(promptPayload, "Card promptPayload must not be null");
+    Objects.requireNonNull(answerPayload, "Card answerPayload must not be null");
+    Objects.requireNonNull(createdAt, "Card createdAt must not be null");
+    return new Card(
+        id,
+        noteId,
+        noteType,
+        cardVariant,
+        ordinal,
+        promptPayload,
+        answerPayload,
+        suspended,
+        createdAt);
+  }
+
   // ---------------------------------------------------------------
   // State transitions
   // ---------------------------------------------------------------

@@ -37,4 +37,19 @@ interface NoteJpaRepository extends JpaRepository<NoteJpaEntity, UUID> {
       @Param("search") String search);
 
   void deleteByDeckId(UUID deckId);
+
+  /** Returns all non-null content hashes for a given deck and note type (for import dedup). */
+  @Query(
+      """
+      SELECT n.contentHash FROM NoteJpaEntity n
+      WHERE n.deckId = :deckId
+        AND n.noteType = :noteType
+        AND n.contentHash IS NOT NULL
+      """)
+  List<String> findContentHashes(@Param("deckId") UUID deckId, @Param("noteType") String noteType);
+
+  /** Updates the content_hash of a single note row by id. */
+  @org.springframework.data.jpa.repository.Modifying
+  @Query("UPDATE NoteJpaEntity n SET n.contentHash = :hash WHERE n.id = :id")
+  void updateContentHash(@Param("id") UUID id, @Param("hash") String hash);
 }

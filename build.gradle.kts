@@ -29,6 +29,7 @@ repositories {
 val archunitVersion = "1.4.1"
 val testcontainersVersion = "1.21.0"
 val jacocoVersion = "0.8.15"
+val jsonSchemaValidatorVersion = "1.5.4"
 
 dependencies {
     // --- Web + REST ---
@@ -52,6 +53,9 @@ dependencies {
     // springdoc-openapi-starter-webmvc-ui is not yet released for Boot 4.
     // In dev profile, we serve the static openapi.yaml directly via Spring MVC.
     // Swagger UI can be served later once springdoc releases a Boot 4 compatible version.
+
+    // --- JSON Schema validation (Draft 2020-12 via networknt) ---
+    implementation("com.networknt:json-schema-validator:${jsonSchemaValidatorVersion}")
 
     // --- Security (OAuth2 Resource Server + JWT) ---
     implementation("org.springframework.boot:spring-boot-starter-security")

@@ -6,6 +6,8 @@ import com.studydeck.domain.port.out.CardScheduleStateRepository;
 import com.studydeck.domain.port.out.ClockPort;
 import com.studydeck.domain.port.out.DeckRepository;
 import com.studydeck.domain.port.out.IdGenerator;
+import com.studydeck.domain.port.out.ImportJobRepository;
+import com.studydeck.domain.port.out.NoteHashRepository;
 import com.studydeck.domain.port.out.NoteRepository;
 import com.studydeck.domain.port.out.ReviewLogRepository;
 import com.studydeck.domain.port.out.ReviewSessionRepository;
@@ -87,5 +89,15 @@ public class PersistenceConfiguration {
   @Bean
   ReviewSessionRepository reviewSessionRepository(ReviewSessionJpaRepository jpaRepo) {
     return new ReviewSessionPersistenceAdapter(jpaRepo);
+  }
+
+  @Bean
+  ImportJobRepository importJobRepository(ImportJobJpaRepository jpaRepo) {
+    return new ImportJobPersistenceAdapter(jpaRepo);
+  }
+
+  @Bean
+  NoteHashRepository noteHashRepository(NoteJpaRepository jpaRepo) {
+    return new NoteHashPersistenceAdapter(jpaRepo);
   }
 }

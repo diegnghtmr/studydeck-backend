@@ -39,6 +39,9 @@ class NoteJpaEntity {
   @Column(nullable = false)
   private int version;
 
+  @Column(name = "content_hash")
+  private String contentHash;
+
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
 
@@ -111,5 +114,13 @@ class NoteJpaEntity {
 
   void setUpdatedAt(Instant updatedAt) {
     this.updatedAt = updatedAt;
+  }
+
+  String getContentHash() {
+    return contentHash;
+  }
+
+  void setContentHash(String contentHash) {
+    this.contentHash = contentHash;
   }
 }

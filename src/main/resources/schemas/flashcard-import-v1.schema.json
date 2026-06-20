@@ -1,0 +1,191 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://studydeck.ai/schemas/flashcard-import-v1.schema.json",
+  "title": "FlashcardImportV1",
+  "description": "Versioned import/export payload for StudyDeck flashcards. Round-trippable: export then import yields equivalent notes.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "deck", "notes"],
+  "properties": {
+    "schemaVersion": {
+      "type": "string",
+      "const": "1.0",
+      "description": "Schema version — mandatory. Only '1.0' is accepted by this implementation."
+    },
+    "deck": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["title"],
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "description": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "notes": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 5000,
+      "items": {
+        "$ref": "#/$defs/ImportNote"
+      }
+    }
+  },
+  "$defs": {
+    "ImportNote": {
+      "oneOf": [
+        { "$ref": "#/$defs/ImportBasicNote" },
+        { "$ref": "#/$defs/ImportReversedNote" },
+        { "$ref": "#/$defs/ImportClozeNote" },
+        { "$ref": "#/$defs/ImportMultipleChoiceNote" },
+        { "$ref": "#/$defs/ImportFreeTextNote" }
+      ]
+    },
+    "ImportCommon": {
+      "type": "object",
+      "properties": {
+        "tags": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "source": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "type": { "type": "string" },
+            "reference": { "type": "string" }
+          }
+        }
+      }
+    },
+    "ImportBasicNote": {
+      "allOf": [
+        { "$ref": "#/$defs/ImportCommon" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["noteType", "front", "back"],
+          "properties": {
+            "noteType": { "const": "basic" },
+            "front": { "type": "string", "minLength": 1, "maxLength": 1000 },
+            "back": { "type": "string", "minLength": 1, "maxLength": 5000 },
+            "tags": { "type": "array", "items": { "type": "string" } },
+            "source": { "$ref": "#/$defs/SourceRef" }
+          }
+        }
+      ]
+    },
+    "ImportReversedNote": {
+      "allOf": [
+        { "$ref": "#/$defs/ImportCommon" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["noteType", "front", "back"],
+          "properties": {
+            "noteType": { "const": "reversed" },
+            "front": { "type": "string", "minLength": 1, "maxLength": 1000 },
+            "back": { "type": "string", "minLength": 1, "maxLength": 5000 },
+            "tags": { "type": "array", "items": { "type": "string" } },
+            "source": { "$ref": "#/$defs/SourceRef" }
+          }
+        }
+      ]
+    },
+    "ImportClozeNote": {
+      "allOf": [
+        { "$ref": "#/$defs/ImportCommon" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["noteType", "text"],
+          "properties": {
+            "noteType": { "const": "cloze" },
+            "text": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 5000,
+              "pattern": ".*\\{\\{c[0-9]+::.+\\}\\}.*"
+            },
+            "tags": { "type": "array", "items": { "type": "string" } },
+            "source": { "$ref": "#/$defs/SourceRef" }
+          }
+        }
+      ]
+    },
+    "ImportMultipleChoiceNote": {
+      "allOf": [
+        { "$ref": "#/$defs/ImportCommon" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["noteType", "question", "options", "correctOptionKeys"],
+          "properties": {
+            "noteType": { "const": "multiple-choice" },
+            "question": { "type": "string", "minLength": 1, "maxLength": 2000 },
+            "options": {
+              "type": "array",
+              "minItems": 4,
+              "maxItems": 5,
+              "items": { "$ref": "#/$defs/MultipleChoiceOption" }
+            },
+            "correctOptionKeys": {
+              "type": "array",
+              "minItems": 1,
+              "maxItems": 1,
+              "uniqueItems": true,
+              "items": { "type": "string", "pattern": "^[A-Z]$" }
+            },
+            "explanation": { "type": "string", "maxLength": 5000 },
+            "tags": { "type": "array", "items": { "type": "string" } },
+            "source": { "$ref": "#/$defs/SourceRef" }
+          }
+        }
+      ]
+    },
+    "ImportFreeTextNote": {
+      "allOf": [
+        { "$ref": "#/$defs/ImportCommon" },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["noteType", "prompt", "expectedAnswer"],
+          "properties": {
+            "noteType": { "const": "free-text" },
+            "prompt": { "type": "string", "minLength": 1, "maxLength": 2000 },
+            "expectedAnswer": { "type": "string", "minLength": 1, "maxLength": 5000 },
+            "gradingGuidance": { "type": "string", "maxLength": 2000 },
+            "tags": { "type": "array", "items": { "type": "string" } },
+            "source": { "$ref": "#/$defs/SourceRef" }
+          }
+        }
+      ]
+    },
+    "MultipleChoiceOption": {
+      "type": "object",
+      "required": ["key", "text"],
+      "properties": {
+        "key": { "type": "string", "pattern": "^[A-Z]$" },
+        "text": { "type": "string", "minLength": 1, "maxLength": 1000 }
+      }
+    },
+    "SourceRef": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": { "type": "string" },
+        "reference": { "type": "string" }
+      }
+    }
+  }
+}

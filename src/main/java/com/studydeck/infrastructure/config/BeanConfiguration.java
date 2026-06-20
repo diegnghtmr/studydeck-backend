@@ -3,6 +3,7 @@ package com.studydeck.infrastructure.config;
 import com.studydeck.application.service.AuthService;
 import com.studydeck.application.service.CardService;
 import com.studydeck.application.service.DeckService;
+import com.studydeck.application.service.ImportExportService;
 import com.studydeck.application.service.NoteService;
 import com.studydeck.application.service.NoteTypeService;
 import com.studydeck.application.service.ProvisionUserService;
@@ -13,6 +14,8 @@ import com.studydeck.domain.port.in.CreateNoteUseCase;
 import com.studydeck.domain.port.in.DeleteCardUseCase;
 import com.studydeck.domain.port.in.DeleteDeckUseCase;
 import com.studydeck.domain.port.in.DeleteNoteUseCase;
+import com.studydeck.domain.port.in.ExecuteImportUseCase;
+import com.studydeck.domain.port.in.ExportDeckUseCase;
 import com.studydeck.domain.port.in.GetCardQuery;
 import com.studydeck.domain.port.in.GetCurrentPrincipalQuery;
 import com.studydeck.domain.port.in.GetDeckQuery;
@@ -27,18 +30,22 @@ import com.studydeck.domain.port.in.ListDueCardsQuery;
 import com.studydeck.domain.port.in.ListNoteTypesQuery;
 import com.studydeck.domain.port.in.ListNotesQuery;
 import com.studydeck.domain.port.in.ListReviewHistoryQuery;
+import com.studydeck.domain.port.in.PreviewImportUseCase;
 import com.studydeck.domain.port.in.ProvisionUserUseCase;
 import com.studydeck.domain.port.in.StartReviewSessionUseCase;
 import com.studydeck.domain.port.in.SubmitReviewUseCase;
 import com.studydeck.domain.port.in.UpdateCardUseCase;
 import com.studydeck.domain.port.in.UpdateDeckUseCase;
 import com.studydeck.domain.port.in.UpdateNoteUseCase;
+import com.studydeck.domain.port.in.ValidateImportUseCase;
 import com.studydeck.domain.port.out.AuditEventPort;
 import com.studydeck.domain.port.out.CardRepository;
 import com.studydeck.domain.port.out.CardScheduleStateRepository;
 import com.studydeck.domain.port.out.ClockPort;
 import com.studydeck.domain.port.out.DeckRepository;
 import com.studydeck.domain.port.out.IdGenerator;
+import com.studydeck.domain.port.out.ImportJobRepository;
+import com.studydeck.domain.port.out.NoteHashRepository;
 import com.studydeck.domain.port.out.NoteRepository;
 import com.studydeck.domain.port.out.ReviewLogRepository;
 import com.studydeck.domain.port.out.ReviewSessionRepository;
@@ -495,5 +502,134 @@ public class BeanConfiguration {
         reviewSessionRepository,
         auditEventPort,
         clockPort);
+  }
+
+  // ---------------------------------------------------------------
+  // Import/Export use cases — all implemented by ImportExportService.
+  // Each port is a separate @Bean to avoid Spring ambiguity.
+  // ---------------------------------------------------------------
+
+  private ImportExportService importExportService(
+      DeckRepository deckRepository,
+      NoteRepository noteRepository,
+      CardRepository cardRepository,
+      CardScheduleStateRepository cardScheduleStateRepository,
+      ClockPort clockPort,
+      AuditEventPort auditEventPort,
+      IdGenerator idGenerator,
+      CardGenerator cardGenerator,
+      ImportJobRepository importJobRepository,
+      NoteHashRepository noteHashRepository) {
+    return new ImportExportService(
+        deckRepository,
+        noteRepository,
+        cardRepository,
+        cardScheduleStateRepository,
+        clockPort,
+        auditEventPort,
+        idGenerator,
+        cardGenerator,
+        importJobRepository,
+        noteHashRepository);
+  }
+
+  @Bean
+  ValidateImportUseCase validateImportUseCase(
+      DeckRepository deckRepository,
+      NoteRepository noteRepository,
+      CardRepository cardRepository,
+      CardScheduleStateRepository cardScheduleStateRepository,
+      ClockPort clockPort,
+      AuditEventPort auditEventPort,
+      IdGenerator idGenerator,
+      CardGenerator cardGenerator,
+      ImportJobRepository importJobRepository,
+      NoteHashRepository noteHashRepository) {
+    return importExportService(
+        deckRepository,
+        noteRepository,
+        cardRepository,
+        cardScheduleStateRepository,
+        clockPort,
+        auditEventPort,
+        idGenerator,
+        cardGenerator,
+        importJobRepository,
+        noteHashRepository);
+  }
+
+  @Bean
+  PreviewImportUseCase previewImportUseCase(
+      DeckRepository deckRepository,
+      NoteRepository noteRepository,
+      CardRepository cardRepository,
+      CardScheduleStateRepository cardScheduleStateRepository,
+      ClockPort clockPort,
+      AuditEventPort auditEventPort,
+      IdGenerator idGenerator,
+      CardGenerator cardGenerator,
+      ImportJobRepository importJobRepository,
+      NoteHashRepository noteHashRepository) {
+    return importExportService(
+        deckRepository,
+        noteRepository,
+        cardRepository,
+        cardScheduleStateRepository,
+        clockPort,
+        auditEventPort,
+        idGenerator,
+        cardGenerator,
+        importJobRepository,
+        noteHashRepository);
+  }
+
+  @Bean
+  ExecuteImportUseCase executeImportUseCase(
+      DeckRepository deckRepository,
+      NoteRepository noteRepository,
+      CardRepository cardRepository,
+      CardScheduleStateRepository cardScheduleStateRepository,
+      ClockPort clockPort,
+      AuditEventPort auditEventPort,
+      IdGenerator idGenerator,
+      CardGenerator cardGenerator,
+      ImportJobRepository importJobRepository,
+      NoteHashRepository noteHashRepository) {
+    return importExportService(
+        deckRepository,
+        noteRepository,
+        cardRepository,
+        cardScheduleStateRepository,
+        clockPort,
+        auditEventPort,
+        idGenerator,
+        cardGenerator,
+        importJobRepository,
+        noteHashRepository);
+  }
+
+  @Bean
+  ExportDeckUseCase exportDeckUseCase(
+      DeckRepository deckRepository,
+      NoteRepository noteRepository,
+      CardRepository cardRepository,
+      CardScheduleStateRepository cardScheduleStateRepository,
+      ClockPort clockPort,
+      AuditEventPort auditEventPort,
+      IdGenerator idGenerator,
+      CardGenerator cardGenerator,
+      ImportJobRepository importJobRepository,
+      NoteHashRepository noteHashRepository) {
+    return importExportService(
+        deckRepository,
+        noteRepository,
+        cardRepository,
+        cardScheduleStateRepository,
+        clockPort,
+        auditEventPort,
+        idGenerator,
+        cardGenerator,
+        importJobRepository,
+        noteHashRepository);
   }
 }

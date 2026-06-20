@@ -22,7 +22,7 @@ import tools.jackson.databind.JsonNode;
  * node is serialized to a JSON string and passed as {@link InputFormat#JSON}.
  */
 @Component
-class ImportSchemaValidator {
+public class ImportSchemaValidator {
 
   private final com.networknt.schema.JsonSchema schema;
 
@@ -42,7 +42,7 @@ class ImportSchemaValidator {
    *
    * @param json the parsed JSON node to validate (tools.jackson type, from Spring MVC)
    */
-  List<String> validate(JsonNode json) {
+  public List<String> validate(JsonNode json) {
     Set<ValidationMessage> messages = schema.validate(json.toString(), InputFormat.JSON);
     return messages.stream().map(ValidationMessage::getMessage).sorted().toList();
   }

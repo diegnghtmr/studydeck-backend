@@ -1,12 +1,13 @@
 ---
 # StudyDeck AI — Docker Compose (core profile)
 # Profiles:
-#   core   → postgres + backend (default)
-#   dev    → enables Swagger UI / openapi endpoint in backend
-#   obs    → otel-collector, prometheus, grafana (Phase 7+)
-#   idp    → local OIDC provider for dev (Phase 1+)
-#   e2e    → Playwright test runner (Phase 1+)
-#   cli    → studydeck-cli image (Phase 4+)
+#   core      → postgres + backend (default)
+#   dev       → enables Swagger UI / openapi endpoint in backend
+#   mcp-http  → exposes a dedicated MCP port (9090→8080) for MCP client tooling
+#   obs       → otel-collector, prometheus, grafana (Phase 7+)
+#   idp       → local OIDC provider for dev (Phase 1+)
+#   e2e       → Playwright test runner (Phase 1+)
+#   cli       → studydeck-cli image (Phase 4+)
 
 name: studydeck
 
@@ -62,6 +63,25 @@ services:
       timeout: 5s
       retries: 5
       start_period: 45s
+
+  # mcp-http profile — exposes a second host port (9090) bound to the backend's
+  # MCP transport (/mcp, JSON-RPC 2.0) so MCP clients can discover the server
+  # without sharing the main API port. The backend must be running (no healthcheck
+  # on the alias service itself — it piggybacks on the backend container).
+  #
+  # Usage: docker compose --profile mcp-http up
+  # MCP endpoint: http://localhost:9090/mcp
+  mcp-http:
+    profiles: [mcp-http]
+    image: alpine/socat:latest
+    container_name: studydeck-mcp-http
+    restart: unless-stopped
+    command: TCP-LISTEN:9090,fork,reuseaddr TCP:studydeck-backend:8080
+    ports:
+      - "${MCP_PORT:-9090}:9090"
+    depends_on:
+      backend:
+        condition: service_healthy
 
   # cli profile — studydeck CLI image; attach to backend network so it can reach
   # the backend service by hostname. Pass STUDYDECK_TOKEN from the host env.

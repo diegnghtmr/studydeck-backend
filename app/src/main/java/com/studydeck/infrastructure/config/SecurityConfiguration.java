@@ -61,6 +61,9 @@ public class SecurityConfiguration {
                     // All v1 endpoints require authentication
                     .requestMatchers("/v1/**")
                     .authenticated()
+                    // MCP transport endpoint requires authentication
+                    .requestMatchers("/mcp", "/mcp/**")
+                    .authenticated()
                     // Everything else — deny by default
                     .anyRequest()
                     .authenticated())

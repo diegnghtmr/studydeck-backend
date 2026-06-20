@@ -9,6 +9,7 @@ import com.studydeck.application.exception.NotFoundException;
 import com.studydeck.application.support.FixedClockPort;
 import com.studydeck.application.support.InMemoryAuditEventPort;
 import com.studydeck.application.support.InMemoryCardRepository;
+import com.studydeck.application.support.InMemoryCardScheduleStateRepository;
 import com.studydeck.application.support.InMemoryDeckRepository;
 import com.studydeck.application.support.InMemoryNoteRepository;
 import com.studydeck.application.support.SequentialIdGenerator;
@@ -68,8 +69,10 @@ class NoteServiceTest {
     aliceDeck = DeckId.generate();
     deckRepo.save(Deck.create(aliceDeck, alice, "Alice Deck", null));
 
+    InMemoryCardScheduleStateRepository scheduleRepo = new InMemoryCardScheduleStateRepository();
     NoteService sut =
-        new NoteService(deckRepo, noteRepo, cardRepo, auditPort, idGen, cardGenerator);
+        new NoteService(
+            deckRepo, noteRepo, cardRepo, scheduleRepo, clock, auditPort, idGen, cardGenerator);
     createNote = sut;
     listNotes = sut;
     getNote = sut;

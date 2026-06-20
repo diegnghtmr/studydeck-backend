@@ -2,10 +2,13 @@ package com.studydeck.infrastructure.adapter.out.persistence;
 
 import com.studydeck.domain.port.out.AuditEventPort;
 import com.studydeck.domain.port.out.CardRepository;
+import com.studydeck.domain.port.out.CardScheduleStateRepository;
 import com.studydeck.domain.port.out.ClockPort;
 import com.studydeck.domain.port.out.DeckRepository;
 import com.studydeck.domain.port.out.IdGenerator;
 import com.studydeck.domain.port.out.NoteRepository;
+import com.studydeck.domain.port.out.ReviewLogRepository;
+import com.studydeck.domain.port.out.ReviewSessionRepository;
 import com.studydeck.domain.port.out.UserAccountRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -63,5 +66,26 @@ public class PersistenceConfiguration {
   @Bean
   ClockPort clockPort() {
     return new SystemClockPort();
+  }
+
+  @Bean
+  CardScheduleStateRepository cardScheduleStateRepository(
+      CardScheduleStateJpaRepository jpaRepo,
+      CardJpaRepository cardJpaRepository,
+      NoteJpaRepository noteJpaRepository) {
+    return new CardScheduleStatePersistenceAdapter(jpaRepo, cardJpaRepository, noteJpaRepository);
+  }
+
+  @Bean
+  ReviewLogRepository reviewLogRepository(
+      ReviewLogJpaRepository jpaRepo,
+      CardJpaRepository cardJpaRepository,
+      NoteJpaRepository noteJpaRepository) {
+    return new ReviewLogPersistenceAdapter(jpaRepo, cardJpaRepository, noteJpaRepository);
+  }
+
+  @Bean
+  ReviewSessionRepository reviewSessionRepository(ReviewSessionJpaRepository jpaRepo) {
+    return new ReviewSessionPersistenceAdapter(jpaRepo);
   }
 }

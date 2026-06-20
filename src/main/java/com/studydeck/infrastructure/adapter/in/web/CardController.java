@@ -11,12 +11,15 @@ import com.studydeck.domain.port.in.DeleteCardUseCase;
 import com.studydeck.domain.port.in.GetCardQuery;
 import com.studydeck.domain.port.in.GetNoteQuery;
 import com.studydeck.domain.port.in.ListCardsQuery;
+import com.studydeck.domain.port.in.ListDueCardsQuery;
 import com.studydeck.domain.port.in.UpdateCardUseCase;
+import com.studydeck.infrastructure.adapter.in.web.dto.CardListResponse;
 import com.studydeck.infrastructure.adapter.in.web.dto.CardPatchRequest;
 import com.studydeck.infrastructure.adapter.in.web.dto.CardResponse;
 import com.studydeck.infrastructure.adapter.in.web.dto.PagedResponse;
 import com.studydeck.infrastructure.adapter.in.web.mapper.CardWebMapper;
 import jakarta.validation.Valid;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.ResponseEntity;
@@ -45,6 +48,7 @@ class CardController {
   private final UpdateCardUseCase updateCard;
   private final DeleteCardUseCase deleteCard;
   private final GetNoteQuery getNote;
+  private final ListDueCardsQuery listDueCards;
   private final CardWebMapper mapper;
 
   CardController(
@@ -53,13 +57,28 @@ class CardController {
       @Qualifier("updateCardUseCase") UpdateCardUseCase updateCard,
       @Qualifier("deleteCardUseCase") DeleteCardUseCase deleteCard,
       @Qualifier("getNoteQuery") GetNoteQuery getNote,
+      @Qualifier("listDueCardsQuery") ListDueCardsQuery listDueCards,
       CardWebMapper mapper) {
     this.listCards = listCards;
     this.getCard = getCard;
     this.updateCard = updateCard;
     this.deleteCard = deleteCard;
     this.getNote = getNote;
+    this.listDueCards = listDueCards;
     this.mapper = mapper;
+  }
+
+  @GetMapping("/due")
+  ResponseEntity<CardListResponse> getDueCards(
+      @RequestParam(required = false) UUID deckId,
+      @RequestParam(defaultValue = "20") int limit,
+      @AuthenticationPrincipal Jwt jwt) {
+    OwnerId ownerId = new OwnerId(UUID.fromString(jwt.getSubject()));
+    DeckId deckIdDomain = deckId != null ? new DeckId(deckId) : null;
+    int effectiveLimit = Math.min(Math.max(1, limit), 200);
+    List<Card> due =
+        listDueCards.execute(new ListDueCardsQuery.Query(ownerId, deckIdDomain, effectiveLimit));
+    return ResponseEntity.ok(mapper.toListResponse(due, deckId));
   }
 
   @GetMapping

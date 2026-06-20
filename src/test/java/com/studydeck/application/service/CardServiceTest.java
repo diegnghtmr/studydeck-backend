@@ -6,8 +6,10 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import com.studydeck.application.common.Page;
 import com.studydeck.application.common.PageRequest;
 import com.studydeck.application.exception.NotFoundException;
+import com.studydeck.application.support.FixedClockPort;
 import com.studydeck.application.support.InMemoryAuditEventPort;
 import com.studydeck.application.support.InMemoryCardRepository;
+import com.studydeck.application.support.InMemoryCardScheduleStateRepository;
 import com.studydeck.application.support.InMemoryDeckRepository;
 import com.studydeck.application.support.InMemoryNoteRepository;
 import com.studydeck.application.support.SequentialIdGenerator;
@@ -66,8 +68,11 @@ class CardServiceTest {
     cardRepo.setNoteIdToDeckId(
         noteId -> noteRepo.findById(noteId).map(n -> n.getDeckId()).orElse(null));
 
+    InMemoryCardScheduleStateRepository scheduleRepo = new InMemoryCardScheduleStateRepository();
+    FixedClockPort clock = FixedClockPort.epoch();
     NoteService noteService =
-        new NoteService(deckRepo, noteRepo, cardRepo, auditPort, idGen, cardGenerator);
+        new NoteService(
+            deckRepo, noteRepo, cardRepo, scheduleRepo, clock, auditPort, idGen, cardGenerator);
     createNote = noteService;
 
     CardService cardService = new CardService(deckRepo, noteRepo, cardRepo, auditPort);

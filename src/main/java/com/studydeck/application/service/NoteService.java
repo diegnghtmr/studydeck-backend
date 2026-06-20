@@ -4,6 +4,7 @@ import com.studydeck.application.common.Page;
 import com.studydeck.application.exception.NotFoundException;
 import com.studydeck.domain.model.Card;
 import com.studydeck.domain.model.CardId;
+import com.studydeck.domain.model.CardScheduleState;
 import com.studydeck.domain.model.Deck;
 import com.studydeck.domain.model.DeckId;
 import com.studydeck.domain.model.Note;
@@ -17,6 +18,8 @@ import com.studydeck.domain.port.in.ListNotesQuery;
 import com.studydeck.domain.port.in.UpdateNoteUseCase;
 import com.studydeck.domain.port.out.AuditEventPort;
 import com.studydeck.domain.port.out.CardRepository;
+import com.studydeck.domain.port.out.CardScheduleStateRepository;
+import com.studydeck.domain.port.out.ClockPort;
 import com.studydeck.domain.port.out.DeckRepository;
 import com.studydeck.domain.port.out.IdGenerator;
 import com.studydeck.domain.port.out.NoteRepository;
@@ -41,6 +44,8 @@ public final class NoteService
   private final DeckRepository deckRepository;
   private final NoteRepository noteRepository;
   private final CardRepository cardRepository;
+  private final CardScheduleStateRepository scheduleStateRepository;
+  private final ClockPort clockPort;
   private final AuditEventPort auditPort;
   private final IdGenerator idGenerator;
   private final CardGenerator cardGenerator;
@@ -49,12 +54,16 @@ public final class NoteService
       DeckRepository deckRepository,
       NoteRepository noteRepository,
       CardRepository cardRepository,
+      CardScheduleStateRepository scheduleStateRepository,
+      ClockPort clockPort,
       AuditEventPort auditPort,
       IdGenerator idGenerator,
       CardGenerator cardGenerator) {
     this.deckRepository = deckRepository;
     this.noteRepository = noteRepository;
     this.cardRepository = cardRepository;
+    this.scheduleStateRepository = scheduleStateRepository;
+    this.clockPort = clockPort;
     this.auditPort = auditPort;
     this.idGenerator = idGenerator;
     this.cardGenerator = cardGenerator;
@@ -80,7 +89,10 @@ public final class NoteService
     noteRepository.save(note);
     cardRepository.saveAll(cards);
 
-    // 5. Audit
+    // 5. Initialize schedule state for each new card (NEW, due immediately)
+    initScheduleStates(command.ownerId(), cards);
+
+    // 6. Audit
     auditPort.record(command.ownerId(), "note.created", "Note", noteId.toString());
 
     List<CardId> cardIds = cards.stream().map(Card::getId).toList();
@@ -133,6 +145,9 @@ public final class NoteService
     List<Card> newCards = cardGenerator.generate(note);
     cardRepository.saveAll(newCards);
 
+    // Initialize schedule state for regenerated cards
+    initScheduleStates(command.ownerId(), newCards);
+
     // Persist updated note
     noteRepository.save(note);
 
@@ -170,6 +185,13 @@ public final class NoteService
   // ---------------------------------------------------------------
   // Private helpers
   // ---------------------------------------------------------------
+
+  private void initScheduleStates(OwnerId ownerId, List<Card> cards) {
+    java.time.Instant now = clockPort.now();
+    for (Card card : cards) {
+      scheduleStateRepository.save(ownerId, card.getId(), CardScheduleState.newFsrsCard(now));
+    }
+  }
 
   private Deck findOwnedDeck(OwnerId ownerId, DeckId deckId) {
     Deck deck =

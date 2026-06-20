@@ -9,11 +9,14 @@ import com.studydeck.domain.port.in.ArchiveDeckUseCase;
 import com.studydeck.domain.port.in.CreateDeckUseCase;
 import com.studydeck.domain.port.in.DeleteDeckUseCase;
 import com.studydeck.domain.port.in.GetDeckQuery;
+import com.studydeck.domain.port.in.GetDeckStatsQuery;
+import com.studydeck.domain.port.in.GetDeckStatsQuery.DeckStatsResult;
 import com.studydeck.domain.port.in.ListDecksQuery;
 import com.studydeck.domain.port.in.UpdateDeckUseCase;
 import com.studydeck.infrastructure.adapter.in.web.dto.DeckCreateRequest;
 import com.studydeck.infrastructure.adapter.in.web.dto.DeckPatchRequest;
 import com.studydeck.infrastructure.adapter.in.web.dto.DeckResponse;
+import com.studydeck.infrastructure.adapter.in.web.dto.DeckStatsResponse;
 import com.studydeck.infrastructure.adapter.in.web.dto.PagedResponse;
 import com.studydeck.infrastructure.adapter.in.web.mapper.DeckWebMapper;
 import jakarta.validation.Valid;
@@ -49,6 +52,7 @@ class DeckController {
   private final UpdateDeckUseCase updateDeck;
   private final ArchiveDeckUseCase archiveDeck;
   private final DeleteDeckUseCase deleteDeck;
+  private final GetDeckStatsQuery getDeckStats;
   private final DeckWebMapper mapper;
 
   DeckController(
@@ -58,6 +62,7 @@ class DeckController {
       @Qualifier("updateDeckUseCase") UpdateDeckUseCase updateDeck,
       @Qualifier("archiveDeckUseCase") ArchiveDeckUseCase archiveDeck,
       @Qualifier("deleteDeckUseCase") DeleteDeckUseCase deleteDeck,
+      @Qualifier("getDeckStatsQuery") GetDeckStatsQuery getDeckStats,
       DeckWebMapper mapper) {
     this.createDeck = createDeck;
     this.listDecks = listDecks;
@@ -65,6 +70,7 @@ class DeckController {
     this.updateDeck = updateDeck;
     this.archiveDeck = archiveDeck;
     this.deleteDeck = deleteDeck;
+    this.getDeckStats = getDeckStats;
     this.mapper = mapper;
   }
 
@@ -134,6 +140,25 @@ class DeckController {
 
     Deck updated = getDeck.execute(new GetDeckQuery.Query(ownerId, did));
     return ResponseEntity.ok(mapper.toResponse(updated));
+  }
+
+  @GetMapping("/{deckId}/stats")
+  ResponseEntity<DeckStatsResponse> getDeckStats(
+      @PathVariable UUID deckId, @AuthenticationPrincipal Jwt jwt) {
+    OwnerId ownerId = new OwnerId(UUID.fromString(jwt.getSubject()));
+    DeckStatsResult stats =
+        getDeckStats.execute(new GetDeckStatsQuery.Query(ownerId, new DeckId(deckId)));
+    DeckStatsResponse response =
+        new DeckStatsResponse(
+            stats.deckId().value(),
+            stats.totalNotes(),
+            stats.totalCards(),
+            stats.dueToday(),
+            stats.reviewedToday(),
+            stats.suspendedCards(),
+            stats.againRate7d(),
+            stats.averageRetention30d());
+    return ResponseEntity.ok(response);
   }
 
   @DeleteMapping("/{deckId}")

@@ -6,6 +6,7 @@ import com.studydeck.application.service.DeckService;
 import com.studydeck.application.service.NoteService;
 import com.studydeck.application.service.NoteTypeService;
 import com.studydeck.application.service.ProvisionUserService;
+import com.studydeck.application.service.ReviewService;
 import com.studydeck.domain.port.in.ArchiveDeckUseCase;
 import com.studydeck.domain.port.in.CreateDeckUseCase;
 import com.studydeck.domain.port.in.CreateNoteUseCase;
@@ -15,22 +16,32 @@ import com.studydeck.domain.port.in.DeleteNoteUseCase;
 import com.studydeck.domain.port.in.GetCardQuery;
 import com.studydeck.domain.port.in.GetCurrentPrincipalQuery;
 import com.studydeck.domain.port.in.GetDeckQuery;
+import com.studydeck.domain.port.in.GetDeckStatsQuery;
+import com.studydeck.domain.port.in.GetNextCardQuery;
 import com.studydeck.domain.port.in.GetNoteQuery;
+import com.studydeck.domain.port.in.GetReviewSessionQuery;
 import com.studydeck.domain.port.in.ListCardsForNoteQuery;
 import com.studydeck.domain.port.in.ListCardsQuery;
 import com.studydeck.domain.port.in.ListDecksQuery;
+import com.studydeck.domain.port.in.ListDueCardsQuery;
 import com.studydeck.domain.port.in.ListNoteTypesQuery;
 import com.studydeck.domain.port.in.ListNotesQuery;
+import com.studydeck.domain.port.in.ListReviewHistoryQuery;
 import com.studydeck.domain.port.in.ProvisionUserUseCase;
+import com.studydeck.domain.port.in.StartReviewSessionUseCase;
+import com.studydeck.domain.port.in.SubmitReviewUseCase;
 import com.studydeck.domain.port.in.UpdateCardUseCase;
 import com.studydeck.domain.port.in.UpdateDeckUseCase;
 import com.studydeck.domain.port.in.UpdateNoteUseCase;
 import com.studydeck.domain.port.out.AuditEventPort;
 import com.studydeck.domain.port.out.CardRepository;
+import com.studydeck.domain.port.out.CardScheduleStateRepository;
 import com.studydeck.domain.port.out.ClockPort;
 import com.studydeck.domain.port.out.DeckRepository;
 import com.studydeck.domain.port.out.IdGenerator;
 import com.studydeck.domain.port.out.NoteRepository;
+import com.studydeck.domain.port.out.ReviewLogRepository;
+import com.studydeck.domain.port.out.ReviewSessionRepository;
 import com.studydeck.domain.port.out.UserAccountRepository;
 import com.studydeck.domain.service.CardGenerator;
 import org.springframework.context.annotation.Bean;
@@ -152,11 +163,20 @@ public class BeanConfiguration {
       DeckRepository deckRepository,
       NoteRepository noteRepository,
       CardRepository cardRepository,
+      CardScheduleStateRepository cardScheduleStateRepository,
+      ClockPort clockPort,
       AuditEventPort auditEventPort,
       IdGenerator idGenerator,
       CardGenerator cardGenerator) {
     return new NoteService(
-        deckRepository, noteRepository, cardRepository, auditEventPort, idGenerator, cardGenerator);
+        deckRepository,
+        noteRepository,
+        cardRepository,
+        cardScheduleStateRepository,
+        clockPort,
+        auditEventPort,
+        idGenerator,
+        cardGenerator);
   }
 
   @Bean
@@ -164,11 +184,20 @@ public class BeanConfiguration {
       DeckRepository deckRepository,
       NoteRepository noteRepository,
       CardRepository cardRepository,
+      CardScheduleStateRepository cardScheduleStateRepository,
+      ClockPort clockPort,
       AuditEventPort auditEventPort,
       IdGenerator idGenerator,
       CardGenerator cardGenerator) {
     return new NoteService(
-        deckRepository, noteRepository, cardRepository, auditEventPort, idGenerator, cardGenerator);
+        deckRepository,
+        noteRepository,
+        cardRepository,
+        cardScheduleStateRepository,
+        clockPort,
+        auditEventPort,
+        idGenerator,
+        cardGenerator);
   }
 
   @Bean
@@ -176,11 +205,20 @@ public class BeanConfiguration {
       DeckRepository deckRepository,
       NoteRepository noteRepository,
       CardRepository cardRepository,
+      CardScheduleStateRepository cardScheduleStateRepository,
+      ClockPort clockPort,
       AuditEventPort auditEventPort,
       IdGenerator idGenerator,
       CardGenerator cardGenerator) {
     return new NoteService(
-        deckRepository, noteRepository, cardRepository, auditEventPort, idGenerator, cardGenerator);
+        deckRepository,
+        noteRepository,
+        cardRepository,
+        cardScheduleStateRepository,
+        clockPort,
+        auditEventPort,
+        idGenerator,
+        cardGenerator);
   }
 
   @Bean
@@ -188,11 +226,20 @@ public class BeanConfiguration {
       DeckRepository deckRepository,
       NoteRepository noteRepository,
       CardRepository cardRepository,
+      CardScheduleStateRepository cardScheduleStateRepository,
+      ClockPort clockPort,
       AuditEventPort auditEventPort,
       IdGenerator idGenerator,
       CardGenerator cardGenerator) {
     return new NoteService(
-        deckRepository, noteRepository, cardRepository, auditEventPort, idGenerator, cardGenerator);
+        deckRepository,
+        noteRepository,
+        cardRepository,
+        cardScheduleStateRepository,
+        clockPort,
+        auditEventPort,
+        idGenerator,
+        cardGenerator);
   }
 
   @Bean
@@ -200,11 +247,20 @@ public class BeanConfiguration {
       DeckRepository deckRepository,
       NoteRepository noteRepository,
       CardRepository cardRepository,
+      CardScheduleStateRepository cardScheduleStateRepository,
+      ClockPort clockPort,
       AuditEventPort auditEventPort,
       IdGenerator idGenerator,
       CardGenerator cardGenerator) {
     return new NoteService(
-        deckRepository, noteRepository, cardRepository, auditEventPort, idGenerator, cardGenerator);
+        deckRepository,
+        noteRepository,
+        cardRepository,
+        cardScheduleStateRepository,
+        clockPort,
+        auditEventPort,
+        idGenerator,
+        cardGenerator);
   }
 
   @Bean
@@ -212,11 +268,20 @@ public class BeanConfiguration {
       DeckRepository deckRepository,
       NoteRepository noteRepository,
       CardRepository cardRepository,
+      CardScheduleStateRepository cardScheduleStateRepository,
+      ClockPort clockPort,
       AuditEventPort auditEventPort,
       IdGenerator idGenerator,
       CardGenerator cardGenerator) {
     return new NoteService(
-        deckRepository, noteRepository, cardRepository, auditEventPort, idGenerator, cardGenerator);
+        deckRepository,
+        noteRepository,
+        cardRepository,
+        cardScheduleStateRepository,
+        clockPort,
+        auditEventPort,
+        idGenerator,
+        cardGenerator);
   }
 
   // ---------------------------------------------------------------
@@ -257,5 +322,178 @@ public class BeanConfiguration {
       CardRepository cardRepository,
       AuditEventPort auditEventPort) {
     return new CardService(deckRepository, noteRepository, cardRepository, auditEventPort);
+  }
+
+  // ---------------------------------------------------------------
+  // Review use cases — StartReviewSession, GetReviewSession, GetNextCard,
+  // SubmitReview, ListDueCards, ListReviewHistory, GetDeckStats.
+  // All implemented by ReviewService; each port is a separate @Bean.
+  // ---------------------------------------------------------------
+
+  private ReviewService reviewService(
+      DeckRepository deckRepository,
+      NoteRepository noteRepository,
+      CardRepository cardRepository,
+      CardScheduleStateRepository cardScheduleStateRepository,
+      ReviewLogRepository reviewLogRepository,
+      ReviewSessionRepository reviewSessionRepository,
+      AuditEventPort auditEventPort,
+      ClockPort clockPort) {
+    return new ReviewService(
+        deckRepository,
+        noteRepository,
+        cardRepository,
+        cardScheduleStateRepository,
+        reviewLogRepository,
+        reviewSessionRepository,
+        auditEventPort,
+        clockPort);
+  }
+
+  @Bean
+  StartReviewSessionUseCase startReviewSessionUseCase(
+      DeckRepository deckRepository,
+      NoteRepository noteRepository,
+      CardRepository cardRepository,
+      CardScheduleStateRepository cardScheduleStateRepository,
+      ReviewLogRepository reviewLogRepository,
+      ReviewSessionRepository reviewSessionRepository,
+      AuditEventPort auditEventPort,
+      ClockPort clockPort) {
+    return reviewService(
+        deckRepository,
+        noteRepository,
+        cardRepository,
+        cardScheduleStateRepository,
+        reviewLogRepository,
+        reviewSessionRepository,
+        auditEventPort,
+        clockPort);
+  }
+
+  @Bean
+  GetReviewSessionQuery getReviewSessionQuery(
+      DeckRepository deckRepository,
+      NoteRepository noteRepository,
+      CardRepository cardRepository,
+      CardScheduleStateRepository cardScheduleStateRepository,
+      ReviewLogRepository reviewLogRepository,
+      ReviewSessionRepository reviewSessionRepository,
+      AuditEventPort auditEventPort,
+      ClockPort clockPort) {
+    return reviewService(
+        deckRepository,
+        noteRepository,
+        cardRepository,
+        cardScheduleStateRepository,
+        reviewLogRepository,
+        reviewSessionRepository,
+        auditEventPort,
+        clockPort);
+  }
+
+  @Bean
+  GetNextCardQuery getNextCardQuery(
+      DeckRepository deckRepository,
+      NoteRepository noteRepository,
+      CardRepository cardRepository,
+      CardScheduleStateRepository cardScheduleStateRepository,
+      ReviewLogRepository reviewLogRepository,
+      ReviewSessionRepository reviewSessionRepository,
+      AuditEventPort auditEventPort,
+      ClockPort clockPort) {
+    return reviewService(
+        deckRepository,
+        noteRepository,
+        cardRepository,
+        cardScheduleStateRepository,
+        reviewLogRepository,
+        reviewSessionRepository,
+        auditEventPort,
+        clockPort);
+  }
+
+  @Bean
+  SubmitReviewUseCase submitReviewUseCase(
+      DeckRepository deckRepository,
+      NoteRepository noteRepository,
+      CardRepository cardRepository,
+      CardScheduleStateRepository cardScheduleStateRepository,
+      ReviewLogRepository reviewLogRepository,
+      ReviewSessionRepository reviewSessionRepository,
+      AuditEventPort auditEventPort,
+      ClockPort clockPort) {
+    return reviewService(
+        deckRepository,
+        noteRepository,
+        cardRepository,
+        cardScheduleStateRepository,
+        reviewLogRepository,
+        reviewSessionRepository,
+        auditEventPort,
+        clockPort);
+  }
+
+  @Bean
+  ListDueCardsQuery listDueCardsQuery(
+      DeckRepository deckRepository,
+      NoteRepository noteRepository,
+      CardRepository cardRepository,
+      CardScheduleStateRepository cardScheduleStateRepository,
+      ReviewLogRepository reviewLogRepository,
+      ReviewSessionRepository reviewSessionRepository,
+      AuditEventPort auditEventPort,
+      ClockPort clockPort) {
+    return reviewService(
+        deckRepository,
+        noteRepository,
+        cardRepository,
+        cardScheduleStateRepository,
+        reviewLogRepository,
+        reviewSessionRepository,
+        auditEventPort,
+        clockPort);
+  }
+
+  @Bean
+  ListReviewHistoryQuery listReviewHistoryQuery(
+      DeckRepository deckRepository,
+      NoteRepository noteRepository,
+      CardRepository cardRepository,
+      CardScheduleStateRepository cardScheduleStateRepository,
+      ReviewLogRepository reviewLogRepository,
+      ReviewSessionRepository reviewSessionRepository,
+      AuditEventPort auditEventPort,
+      ClockPort clockPort) {
+    return reviewService(
+        deckRepository,
+        noteRepository,
+        cardRepository,
+        cardScheduleStateRepository,
+        reviewLogRepository,
+        reviewSessionRepository,
+        auditEventPort,
+        clockPort);
+  }
+
+  @Bean
+  GetDeckStatsQuery getDeckStatsQuery(
+      DeckRepository deckRepository,
+      NoteRepository noteRepository,
+      CardRepository cardRepository,
+      CardScheduleStateRepository cardScheduleStateRepository,
+      ReviewLogRepository reviewLogRepository,
+      ReviewSessionRepository reviewSessionRepository,
+      AuditEventPort auditEventPort,
+      ClockPort clockPort) {
+    return reviewService(
+        deckRepository,
+        noteRepository,
+        cardRepository,
+        cardScheduleStateRepository,
+        reviewLogRepository,
+        reviewSessionRepository,
+        auditEventPort,
+        clockPort);
   }
 }

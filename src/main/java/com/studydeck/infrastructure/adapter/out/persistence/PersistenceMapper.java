@@ -12,6 +12,8 @@ import com.studydeck.domain.model.NoteContent;
 import com.studydeck.domain.model.NoteId;
 import com.studydeck.domain.model.NoteType;
 import com.studydeck.domain.model.OwnerId;
+import com.studydeck.domain.model.UserAccount;
+import com.studydeck.domain.model.UserAccountStatus;
 import java.util.List;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.json.JsonMapper;
@@ -131,6 +133,31 @@ class PersistenceMapper {
     e.setAnswerPayload(serializeCardPayload(card.getAnswerPayload()));
     e.setSuspended(card.isSuspended());
     e.setCreatedAt(card.getCreatedAt());
+    return e;
+  }
+
+  // ---------------------------------------------------------------
+  // UserAccount
+  // ---------------------------------------------------------------
+
+  UserAccount toDomain(UserAccountJpaEntity e) {
+    return UserAccount.reconstitute(
+        new OwnerId(e.getId()),
+        e.getEmail(),
+        e.getDisplayName(),
+        UserAccountStatus.valueOf(e.getStatus()),
+        e.getCreatedAt(),
+        e.getUpdatedAt());
+  }
+
+  UserAccountJpaEntity toJpa(UserAccount account) {
+    UserAccountJpaEntity e = new UserAccountJpaEntity();
+    e.setId(account.getId().value());
+    e.setEmail(account.getEmail());
+    e.setDisplayName(account.getDisplayName());
+    e.setStatus(account.getStatus().name());
+    e.setCreatedAt(account.getCreatedAt());
+    e.setUpdatedAt(account.getUpdatedAt());
     return e;
   }
 

@@ -68,4 +68,21 @@ class HexagonalArchitectureTest {
           .dependOnClassesThat()
           .resideInAPackage("com.studydeck.infrastructure.adapter.out..")
           .allowEmptyShould(true);
+
+  /**
+   * Web controllers must only depend on input port interfaces (domain.port.in), not on application
+   * services or persistence adapters directly. This enforces the port/adapter boundary.
+   */
+  @ArchTest
+  static final ArchRule controllersMustDependOnInputPortsNotServices =
+      noClasses()
+          .that()
+          .resideInAPackage("com.studydeck.infrastructure.adapter.in.web")
+          .and()
+          .haveSimpleNameEndingWith("Controller")
+          .should()
+          .dependOnClassesThat()
+          .resideInAnyPackage(
+              "com.studydeck.application.service..", "com.studydeck.infrastructure.adapter.out..")
+          .allowEmptyShould(true);
 }

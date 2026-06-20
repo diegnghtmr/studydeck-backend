@@ -6,6 +6,7 @@ import com.studydeck.domain.port.out.ClockPort;
 import com.studydeck.domain.port.out.DeckRepository;
 import com.studydeck.domain.port.out.IdGenerator;
 import com.studydeck.domain.port.out.NoteRepository;
+import com.studydeck.domain.port.out.UserAccountRepository;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.jpa.repository.config.EnableJpaRepositories;
@@ -41,6 +42,12 @@ public class PersistenceConfiguration {
   @Bean
   CardRepository cardRepository(CardJpaRepository jpaRepo, PersistenceMapper mapper) {
     return new CardPersistenceAdapter(jpaRepo, mapper);
+  }
+
+  @Bean
+  UserAccountRepository userAccountRepository(
+      UserAccountJpaRepository jpaRepo, PersistenceMapper mapper) {
+    return new UserAccountPersistenceAdapter(jpaRepo, mapper);
   }
 
   @Bean

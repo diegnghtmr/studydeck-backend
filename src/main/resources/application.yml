@@ -32,6 +32,15 @@ spring:
     virtual:
       enabled: true
 
+  # Security: OAuth2 Resource Server
+  # Dev profile overrides this with a static HS256 decoder (DevSecurityConfiguration).
+  # Prod requires SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI env var.
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI:}
+
   # Note: Jackson 3.x (used by Spring Boot 4) changed serialization feature property names.
   # Configuring Jackson via application.yml is done in a dedicated @Configuration if needed.
   # spring.jackson.serialization.write-dates-as-timestamps is not supported in Jackson 3.x format.

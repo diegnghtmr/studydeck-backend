@@ -53,6 +53,11 @@ dependencies {
     // In dev profile, we serve the static openapi.yaml directly via Spring MVC.
     // Swagger UI can be served later once springdoc releases a Boot 4 compatible version.
 
+    // --- Security (OAuth2 Resource Server + JWT) ---
+    implementation("org.springframework.boot:spring-boot-starter-security")
+    implementation("org.springframework.boot:spring-boot-starter-security-oauth2-resource-server")
+    testImplementation("org.springframework.boot:spring-boot-starter-security-oauth2-resource-server-test")
+
     // --- Testing ---
     testImplementation("org.springframework.boot:spring-boot-starter-test")
 

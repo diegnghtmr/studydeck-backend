@@ -3,6 +3,8 @@ package com.studydeck.infrastructure.adapter.in.web;
 import com.studydeck.application.exception.ForbiddenException;
 import com.studydeck.application.exception.NotFoundException;
 import com.studydeck.domain.exception.DomainValidationException;
+import com.studydeck.domain.port.out.AiChatPort.AiChatUnavailableException;
+import com.studydeck.domain.port.out.AiSchemaValidationPort.AiOutputSchemaViolationException;
 import jakarta.servlet.http.HttpServletRequest;
 import java.net.URI;
 import java.util.List;
@@ -108,6 +110,29 @@ class GlobalExceptionHandler {
     pd.setTitle("Bad Request");
     pd.setType(URI.create(PROBLEM_BASE + "/bad-request"));
     pd.setInstance(URI.create(request.getRequestURI()));
+    return problemResponse(pd);
+  }
+
+  @ExceptionHandler(AiChatUnavailableException.class)
+  ResponseEntity<ProblemDetail> handleAiChatUnavailable(
+      AiChatUnavailableException ex, HttpServletRequest request) {
+    var pd = ProblemDetail.forStatusAndDetail(HttpStatus.SERVICE_UNAVAILABLE, ex.getMessage());
+    pd.setTitle("AI Chat Provider Not Configured");
+    pd.setType(URI.create(PROBLEM_BASE + "/ai-chat-unavailable"));
+    pd.setInstance(URI.create(request.getRequestURI()));
+    return problemResponse(pd);
+  }
+
+  @ExceptionHandler(AiOutputSchemaViolationException.class)
+  ResponseEntity<ProblemDetail> handleAiSchemaViolation(
+      AiOutputSchemaViolationException ex, HttpServletRequest request) {
+    var pd =
+        ProblemDetail.forStatusAndDetail(
+            HttpStatus.resolve(422), "AI output did not conform to FlashcardImportV1 schema");
+    pd.setTitle("AI Output Schema Violation");
+    pd.setType(URI.create(PROBLEM_BASE + "/ai-schema-violation"));
+    pd.setInstance(URI.create(request.getRequestURI()));
+    pd.setProperty("violations", ex.getViolations());
     return problemResponse(pd);
   }
 

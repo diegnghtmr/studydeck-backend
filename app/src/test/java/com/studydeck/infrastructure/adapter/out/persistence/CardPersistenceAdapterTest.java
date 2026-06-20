@@ -16,6 +16,7 @@ import com.studydeck.domain.port.out.CardRepository;
 import com.studydeck.domain.port.out.DeckRepository;
 import com.studydeck.domain.port.out.NoteRepository;
 import com.studydeck.domain.service.CardGenerator;
+import com.studydeck.integration.AiTestConfiguration;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -24,6 +25,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,6 +38,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  *
  * <p>Tests CardPayload JSONB round-trips for all payload types, and persistence operations.
  */
+@Import(AiTestConfiguration.class)
 @SpringBootTest
 @Testcontainers
 @Transactional

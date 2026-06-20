@@ -28,6 +28,14 @@ val archunitVersion = "1.4.1"
 val testcontainersVersion = "1.21.0"
 val jacocoVersion = "0.8.15"
 val jsonSchemaValidatorVersion = "1.5.4"
+val springAiVersion = "2.0.0"
+
+dependencyManagement {
+    imports {
+        // Spring AI BOM for Boot 4.x — manages all spring-ai-* artifact versions.
+        mavenBom("org.springframework.ai:spring-ai-bom:$springAiVersion")
+    }
+}
 
 dependencies {
     // --- Web + REST ---
@@ -41,6 +49,19 @@ dependencies {
     // --- Migrations ---
     implementation("org.springframework.boot:spring-boot-starter-flyway")
     implementation("org.flywaydb:flyway-database-postgresql")
+
+    // --- Spring AI: local ONNX embeddings (no external service required) ---
+    // TransformersEmbeddingModel uses all-MiniLM-L6-v2 (384 dims) by default.
+    implementation("org.springframework.ai:spring-ai-starter-model-transformers")
+
+    // --- Spring AI: pgvector VectorStore (semantic search) ---
+    implementation("org.springframework.ai:spring-ai-starter-vector-store-pgvector")
+
+    // --- Spring AI: chat (optional — graceful no-provider behavior) ---
+    // ChatModel is optional: if no api-key/base-url is configured the app still boots.
+    // Ollama (local) and OpenAI are supported via env; others can be added later.
+    implementation("org.springframework.ai:spring-ai-starter-model-ollama")
+    implementation("org.springframework.ai:spring-ai-starter-model-openai")
 
     // --- Observability ---
     implementation("org.springframework.boot:spring-boot-starter-actuator")

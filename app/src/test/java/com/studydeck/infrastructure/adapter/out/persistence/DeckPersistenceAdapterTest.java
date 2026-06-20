@@ -6,6 +6,7 @@ import com.studydeck.domain.model.Deck;
 import com.studydeck.domain.model.DeckId;
 import com.studydeck.domain.model.OwnerId;
 import com.studydeck.domain.port.out.DeckRepository;
+import com.studydeck.integration.AiTestConfiguration;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -15,6 +16,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +30,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * <p>Uses Testcontainers with pgvector:pg17 image. Flyway migrations (V1 + V2) run automatically
  * via Spring Boot auto-configuration.
  */
+@Import(AiTestConfiguration.class)
 @SpringBootTest
 @Testcontainers
 @Transactional

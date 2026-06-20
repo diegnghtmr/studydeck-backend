@@ -21,6 +21,7 @@ import com.studydeck.domain.port.in.DeleteDeckUseCase;
 import com.studydeck.domain.port.in.GetDeckQuery;
 import com.studydeck.domain.port.in.ListDecksQuery;
 import com.studydeck.domain.port.in.UpdateDeckUseCase;
+import com.studydeck.integration.AiTestConfiguration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +31,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -51,6 +53,7 @@ import tools.jackson.databind.ObjectMapper;
  * SecurityMockMvcRequestPostProcessors.jwt()}.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
+@Import(AiTestConfiguration.class)
 @Testcontainers
 @ActiveProfiles("dev")
 class DeckControllerTest {

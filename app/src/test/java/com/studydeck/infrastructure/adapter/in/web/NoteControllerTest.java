@@ -21,6 +21,7 @@ import com.studydeck.domain.port.in.GetNoteQuery;
 import com.studydeck.domain.port.in.ListCardsForNoteQuery;
 import com.studydeck.domain.port.in.ListNotesQuery;
 import com.studydeck.domain.port.in.UpdateNoteUseCase;
+import com.studydeck.integration.AiTestConfiguration;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -30,6 +31,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -50,6 +52,7 @@ import tools.jackson.databind.ObjectMapper;
  * validation failure.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
+@Import(AiTestConfiguration.class)
 @Testcontainers
 @ActiveProfiles("dev")
 class NoteControllerTest {

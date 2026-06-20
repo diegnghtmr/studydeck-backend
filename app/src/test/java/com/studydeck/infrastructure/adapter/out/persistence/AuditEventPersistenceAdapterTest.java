@@ -4,11 +4,13 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import com.studydeck.domain.model.OwnerId;
 import com.studydeck.domain.port.out.AuditEventPort;
+import com.studydeck.integration.AiTestConfiguration;
 import java.util.List;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.annotation.Transactional;
@@ -17,6 +19,7 @@ import org.testcontainers.junit.jupiter.Container;
 import org.testcontainers.junit.jupiter.Testcontainers;
 
 /** Integration test for {@link AuditEventPersistenceAdapter}. */
+@Import(AiTestConfiguration.class)
 @SpringBootTest
 @Testcontainers
 @Transactional

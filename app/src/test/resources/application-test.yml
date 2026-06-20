@@ -1,0 +1,15 @@
+# Test profile — overrides AI properties so integration tests don't try to download ONNX models.
+#
+# The AiTestConfiguration provides stub VectorStore, EmbeddingModel, TextEmbeddingPort, and
+# AiChatPort beans (@Primary) that replace the real Spring AI beans.
+#
+# Disable the transformers embedding model download in tests — the @Primary stub from
+# AiTestConfiguration takes over.
+spring:
+  ai:
+    model:
+      embedding: none  # Disable all embedding auto-configs (set to explicit none)
+      chat: none       # No chat provider in tests
+    vectorstore:
+      pgvector:
+        initialize-schema: false

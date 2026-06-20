@@ -11,6 +11,7 @@ import com.studydeck.domain.model.NoteType;
 import com.studydeck.domain.model.OwnerId;
 import com.studydeck.domain.port.out.DeckRepository;
 import com.studydeck.domain.port.out.NoteRepository;
+import com.studydeck.integration.AiTestConfiguration;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -20,6 +21,7 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,6 +34,7 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  *
  * <p>Tests JSONB round-trips for all 5 NoteContent sealed variants.
  */
+@Import(AiTestConfiguration.class)
 @SpringBootTest
 @Testcontainers
 @Transactional

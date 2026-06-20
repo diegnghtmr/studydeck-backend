@@ -33,6 +33,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
  */
 @Configuration
 @EnableWebSecurity
+@org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity
 public class SecurityConfiguration {
 
   /**

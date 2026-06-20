@@ -7,6 +7,16 @@ FROM eclipse-temurin:26-jdk-noble AS build
 
 WORKDIR /workspace
 
+# Pre-download the ONNX embedding model (the build stage has network) so the RUNTIME
+# image boots fully OFFLINE — no HuggingFace dependency at startup. Cached as its own layer.
+RUN apt-get update && apt-get install -y --no-install-recommends curl ca-certificates \
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /workspace/models \
+    && curl -fSL --retry 3 --retry-delay 2 -o /workspace/models/model.onnx \
+       https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx \
+    && curl -fSL --retry 3 --retry-delay 2 -o /workspace/models/tokenizer.json \
+       https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main/tokenizer.json
+
 # Copy Gradle wrapper files first (layer caching)
 COPY gradle gradle
 COPY gradlew .
@@ -49,6 +59,11 @@ COPY --from=build --chown=studydeck:studydeck /workspace/app/build/extracted/dep
 COPY --from=build --chown=studydeck:studydeck /workspace/app/build/extracted/spring-boot-loader/ ./
 COPY --from=build --chown=studydeck:studydeck /workspace/app/build/extracted/snapshot-dependencies/ ./
 COPY --from=build --chown=studydeck:studydeck /workspace/app/build/extracted/application/ ./
+
+# Baked ONNX embedding model — app reads these local files instead of downloading at boot.
+COPY --from=build --chown=studydeck:studydeck /workspace/models /app/models
+ENV SPRING_AI_EMBEDDING_TRANSFORMER_ONNX_MODEL_URI=file:/app/models/model.onnx \
+    SPRING_AI_EMBEDDING_TRANSFORMER_TOKENIZER_URI=file:/app/models/tokenizer.json
 
 USER studydeck
 

@@ -45,6 +45,68 @@ spring:
   # Configuring Jackson via application.yml is done in a dedicated @Configuration if needed.
   # spring.jackson.serialization.write-dates-as-timestamps is not supported in Jackson 3.x format.
 
+  # Spring AI configuration
+  ai:
+    # Select ONLY the ONNX Transformers embedding model.
+    # Prevents Ollama and OpenAI EmbeddingModel beans from being created.
+    # Each auto-config checks: spring.ai.model.embedding havingValue="<provider>"
+    # Setting it to "transformers" disables all other embedding models.
+    model:
+      embedding: transformers
+      chat: none  # No chat provider by default; set to "ollama" or "openai" via env to enable.
+
+    # Local ONNX Transformers embedding (no external service required).
+    # Model: all-MiniLM-L6-v2 (384 dims). Downloaded once on first startup.
+    embedding:
+      transformer:
+        onnx:
+          model-uri: ${SPRING_AI_EMBEDDING_TRANSFORMER_ONNX_MODEL_URI:https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main/onnx/model.onnx}
+        tokenizer:
+          uri: ${SPRING_AI_EMBEDDING_TRANSFORMER_TOKENIZER_URI:https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2/resolve/main/tokenizer.json}
+
+    # pgvector VectorStore — uses the existing datasource.
+    # dimension=384 matches all-MiniLM-L6-v2.
+    vectorstore:
+      pgvector:
+        index-type: NONE
+        distance-type: COSINE_DISTANCE
+        dimensions: 384
+        initialize-schema: false  # Schema managed by Flyway V5 migration.
+
+    # Disable Ollama/OpenAI embedding — only ONNX Transformers is used.
+    # This prevents ambiguous EmbeddingModel beans when multiple starters are on the classpath.
+    ollama:
+      # Placeholder base-url so OllamaApiAutoConfiguration can instantiate without error even
+      # when Ollama is unused (chat=none). Override with the real Ollama service URL to enable chat.
+      base-url: ${SPRING_AI_OLLAMA_BASE_URL:http://localhost:11434}
+      embedding:
+        enabled: false
+      chat:
+        enabled: ${SPRING_AI_OLLAMA_CHAT_ENABLED:false}
+        options:
+          model: ${SPRING_AI_OLLAMA_CHAT_MODEL:llama3}
+    openai:
+      api-key: ${SPRING_AI_OPENAI_API_KEY:}
+      embedding:
+        enabled: false
+      chat:
+        enabled: ${SPRING_AI_OPENAI_CHAT_ENABLED:false}
+        options:
+          model: ${SPRING_AI_OPENAI_CHAT_MODEL:gpt-4o}
+
+    # Chat providers: configure ONE via environment variables.
+    # App boots and embedding/search work without any chat provider configured.
+    # Ollama (local): set SPRING_AI_OLLAMA_CHAT_ENABLED=true + SPRING_AI_OLLAMA_BASE_URL=http://localhost:11434
+    # OpenAI: set SPRING_AI_OPENAI_CHAT_ENABLED=true + SPRING_AI_OPENAI_API_KEY=sk-...
+    # Without any provider: chat/generate endpoints return 503 gracefully.
+
+# StudyDeck AI properties
+studydeck:
+  ai:
+    embedding:
+      model-name: ${STUDYDECK_AI_EMBEDDING_MODEL:all-MiniLM-L6-v2}
+      dimensions: ${STUDYDECK_AI_EMBEDDING_DIMS:384}
+
 server:
   port: 8080
   error:

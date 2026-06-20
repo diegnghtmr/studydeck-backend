@@ -12,6 +12,12 @@ COPY gradlew .
 COPY settings.gradle.kts .
 COPY build.gradle.kts .
 
+# Bootstrap the Gradle distribution first, with retries (the wrapper download can
+# hit transient redirect/network flakes inside the build sandbox).
+RUN ./gradlew --version --no-daemon \
+    || ./gradlew --version --no-daemon \
+    || ./gradlew --version --no-daemon
+
 # Download dependencies (cached layer)
 RUN ./gradlew dependencies --no-daemon --quiet 2>/dev/null || true
 
@@ -24,6 +30,11 @@ RUN ./gradlew bootJar --no-daemon -x test -x spotlessCheck && \
 
 # ---- RUN STAGE ----
 FROM eclipse-temurin:26-jre-noble AS runtime
+
+# curl is required by the container HEALTHCHECK (jre-noble does not ship it).
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends curl \
+    && rm -rf /var/lib/apt/lists/*
 
 # Non-root user for security
 RUN groupadd --system studydeck && useradd --system --gid studydeck studydeck

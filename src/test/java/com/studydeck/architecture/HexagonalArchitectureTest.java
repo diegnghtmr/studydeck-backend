@@ -85,4 +85,19 @@ class HexagonalArchitectureTest {
           .resideInAnyPackage(
               "com.studydeck.application.service..", "com.studydeck.infrastructure.adapter.out..")
           .allowEmptyShould(true);
+
+  /**
+   * Scheduling domain (domain.service.Fsrs/Sm2Scheduler, domain.model.CardScheduleState etc.) must
+   * never depend on any future AI package. The scheduler is deterministic and user-driven; the AI
+   * subsystem must not influence it.
+   */
+  @ArchTest
+  static final ArchRule schedulingDomainMustNotDependOnAiPackage =
+      noClasses()
+          .that()
+          .resideInAPackage("com.studydeck.domain..")
+          .should()
+          .dependOnClassesThat()
+          .resideInAPackage("com.studydeck..ai..")
+          .allowEmptyShould(true);
 }

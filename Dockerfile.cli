@@ -1,0 +1,45 @@
+# Multi-stage build for the :cli fat jar.
+# Requires JDK 26 to compile (--release 25).
+
+# ---- BUILD STAGE ----
+FROM eclipse-temurin:26-jdk-noble AS build
+
+WORKDIR /workspace
+
+# Copy Gradle wrapper files first (layer caching)
+COPY gradle gradle
+COPY gradlew .
+COPY settings.gradle.kts .
+COPY build.gradle.kts .
+COPY app/build.gradle.kts app/
+COPY cli/build.gradle.kts cli/
+
+# Bootstrap the Gradle distribution
+RUN ./gradlew --version --no-daemon \
+    || ./gradlew --version --no-daemon \
+    || ./gradlew --version --no-daemon
+
+# Download dependencies (cached layer)
+RUN ./gradlew :cli:dependencies --no-daemon --quiet 2>/dev/null || true
+
+# Copy only what the CLI needs
+COPY cli/src cli/src
+COPY openapi.yaml .
+
+RUN ./gradlew :cli:jar --no-daemon -x test -x spotlessCheck
+
+# ---- RUN STAGE ----
+FROM eclipse-temurin:26-jre-noble AS runtime
+
+# Non-root user for security
+RUN groupadd --system studydeck && useradd --system --gid studydeck studydeck
+
+WORKDIR /app
+
+COPY --from=build --chown=studydeck:studydeck /workspace/cli/build/libs/cli-*.jar ./studydeck-cli.jar
+
+USER studydeck
+
+# Default entrypoint — callers pass subcommand arguments
+ENTRYPOINT ["java", "-jar", "/app/studydeck-cli.jar"]
+CMD ["--help"]

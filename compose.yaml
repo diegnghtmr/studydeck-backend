@@ -62,3 +62,23 @@ services:
       timeout: 5s
       retries: 5
       start_period: 45s
+
+  # cli profile — studydeck CLI image; attach to backend network so it can reach
+  # the backend service by hostname. Pass STUDYDECK_TOKEN from the host env.
+  cli:
+    profiles: [cli]
+    build:
+      context: .
+      dockerfile: Dockerfile.cli
+    container_name: studydeck-cli
+    environment:
+      STUDYDECK_BASE_URL: http://studydeck-backend:8080
+      STUDYDECK_TOKEN: ${STUDYDECK_TOKEN:-}
+    depends_on:
+      backend:
+        condition: service_healthy
+    # CLI is a one-shot tool; no restart policy needed
+    restart: "no"
+    # Default: show help. Override CMD at runtime with the subcommand to run.
+    # Example: docker compose --profile cli run --rm cli deck ls
+    command: ["--help"]

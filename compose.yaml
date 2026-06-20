@@ -1,0 +1,64 @@
+---
+# StudyDeck AI — Docker Compose (core profile)
+# Profiles:
+#   core   → postgres + backend (default)
+#   dev    → enables Swagger UI / openapi endpoint in backend
+#   obs    → otel-collector, prometheus, grafana (Phase 7+)
+#   idp    → local OIDC provider for dev (Phase 1+)
+#   e2e    → Playwright test runner (Phase 1+)
+#   cli    → studydeck-cli image (Phase 4+)
+
+name: studydeck
+
+volumes:
+  postgres_data:
+    driver: local
+
+services:
+  postgres:
+    image: pgvector/pgvector:pg17
+    container_name: studydeck-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: studydeck
+      POSTGRES_USER: ${DB_USER:-studydeck}
+      POSTGRES_PASSWORD: ${DB_PASS:-studydeck}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-studydeck} -d studydeck"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: studydeck-backend
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DB_URL: jdbc:postgresql://postgres:5432/studydeck
+      DB_USER: ${DB_USER:-studydeck}
+      DB_PASS: ${DB_PASS:-studydeck}
+      # Default to prod profile; override to dev for local exploration
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      JAVA_TOOL_OPTIONS: "-Djava.security.egd=file:/dev/./urandom"
+    ports:
+      - "${BACKEND_PORT:-8080}:8080"
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "curl -f http://localhost:8080/actuator/health || exit 1",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 45s

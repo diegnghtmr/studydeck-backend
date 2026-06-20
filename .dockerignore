@@ -1,0 +1,33 @@
+# Build artifacts
+build/
+.gradle/
+
+# IDE and OS
+.idea/
+*.iml
+.DS_Store
+*.swp
+*.swo
+.vscode/
+
+# Git
+.git/
+.gitignore
+
+# Dev docs (NEVER commit dev docs into the image)
+*.md
+prd.md
+trd.md
+DESIGN.md
+
+# Secrets — never include in Docker context
+.env
+.env.*
+secrets/
+*.pem
+*.key
+*.p12
+*.jks
+
+# Test artifacts
+src/test/

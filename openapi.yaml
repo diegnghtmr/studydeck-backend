@@ -1,0 +1,3181 @@
+openapi: 3.1.0
+jsonSchemaDialect: https://json-schema.org/draft/2020-12/schema
+info:
+  title: StudyDeck AI API
+  version: 1.0.0
+  summary: API versionada para una plataforma de estudio tipo Anki con IA, RAG, MCP y observabilidad.
+  description: |
+    OpenAPI 3.1 para StudyDeck AI.
+    Diseño orientado a monolito modular hexagonal en Java 25 + Spring Boot 4.x + Spring AI 2.x.
+    Defaults asumidos:
+      - API versionada en /v1
+      - paginación por offset: page=0, size=20, maxSize=100
+      - sorting por createdAt asc salvo endpoints de revisión
+      - autenticación principal: OAuth2/OIDC + JWT; API keys con scopes para automatización cuando aplique
+      - roles y scopes descritos en securitySchemes y descripciones de operación
+servers:
+  - url: http://localhost:8080
+    description: Backend local en Docker Compose
+  - url: http://localhost:8080/actuator
+    description: Actuator local en Docker Compose
+  - url: https://api.studydeck.ai
+    description: Producción
+tags:
+  - name: Auth
+  - name: Users
+  - name: Decks
+  - name: NoteTypes
+  - name: Notes
+  - name: Cards
+  - name: Reviews
+  - name: AI
+  - name: Documents
+  - name: RAG
+  - name: ImportExport
+  - name: MCP
+  - name: Skills
+  - name: Admin
+  - name: Observability
+security:
+  - oauth2:
+      - study.read
+
+paths:
+  /v1/auth/me:
+    get:
+      tags: [Auth]
+      summary: Obtener principal autenticado
+      operationId: getCurrentPrincipal
+      security:
+        - oauth2: [study.read]
+      responses:
+        "200":
+          description: Principal autenticado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AuthPrincipal"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
+  /v1/security/csrf-token:
+    get:
+      tags: [Auth]
+      summary: Obtener token CSRF si se opera en modo cookie/session
+      operationId: getCsrfToken
+      security:
+        - oauth2: [study.read]
+      responses:
+        "200":
+          description: Token CSRF
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [token, headerName]
+                properties:
+                  token:
+                    type: string
+                  headerName:
+                    type: string
+                    default: X-CSRF-TOKEN
+
+  /v1/users:
+    get:
+      tags: [Users]
+      summary: Listar usuarios
+      operationId: listUsers
+      security:
+        - oauth2: [admin.read]
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Size"
+        - $ref: "#/components/parameters/Sort"
+        - in: query
+          name: search
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Página de usuarios
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedUsers"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+    post:
+      tags: [Users]
+      summary: Crear usuario administrativo o de servicio
+      operationId: createUser
+      security:
+        - oauth2: [admin.write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserCreateRequest"
+      responses:
+        "201":
+          description: Usuario creado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "409":
+          $ref: "#/components/responses/Conflict"
+
+  /v1/users/{userId}:
+    parameters:
+      - $ref: "#/components/parameters/UserId"
+    get:
+      tags: [Users]
+      summary: Obtener usuario por id
+      operationId: getUser
+      security:
+        - oauth2: [admin.read]
+      responses:
+        "200":
+          description: Usuario
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Users]
+      summary: Actualizar usuario
+      operationId: patchUser
+      security:
+        - oauth2: [admin.write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UserPatchRequest"
+      responses:
+        "200":
+          description: Usuario actualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/User"
+    delete:
+      tags: [Users]
+      summary: Desactivar usuario
+      operationId: deactivateUser
+      security:
+        - oauth2: [admin.write]
+      responses:
+        "204":
+          description: Usuario desactivado
+
+  /v1/note-types:
+    get:
+      tags: [NoteTypes]
+      summary: Listar tipos de nota/tarjeta soportados
+      operationId: listNoteTypes
+      security:
+        - oauth2: [study.read]
+      responses:
+        "200":
+          description: Tipos soportados
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/NoteTypeDescriptor"
+
+  /v1/decks:
+    get:
+      tags: [Decks]
+      summary: Listar mazos
+      operationId: listDecks
+      security:
+        - oauth2: [study.read]
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Size"
+        - $ref: "#/components/parameters/Sort"
+        - in: query
+          name: archived
+          schema:
+            type: boolean
+        - in: query
+          name: search
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Página de mazos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedDecks"
+    post:
+      tags: [Decks]
+      summary: Crear mazo
+      operationId: createDeck
+      security:
+        - oauth2: [study.write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeckCreateRequest"
+      responses:
+        "201":
+          description: Mazo creado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Deck"
+
+  /v1/decks/{deckId}:
+    parameters:
+      - $ref: "#/components/parameters/DeckId"
+    get:
+      tags: [Decks]
+      summary: Obtener mazo
+      operationId: getDeck
+      security:
+        - oauth2: [study.read]
+      responses:
+        "200":
+          description: Mazo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Deck"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Decks]
+      summary: Actualizar mazo
+      operationId: patchDeck
+      security:
+        - oauth2: [study.write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeckPatchRequest"
+      responses:
+        "200":
+          description: Mazo actualizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Deck"
+    delete:
+      tags: [Decks]
+      summary: Archivar o eliminar mazo
+      operationId: deleteDeck
+      security:
+        - oauth2: [study.write]
+      parameters:
+        - in: query
+          name: hardDelete
+          schema:
+            type: boolean
+            default: false
+      responses:
+        "204":
+          description: Mazo archivado o eliminado
+
+  /v1/decks/{deckId}/stats:
+    parameters:
+      - $ref: "#/components/parameters/DeckId"
+    get:
+      tags: [Decks]
+      summary: Obtener estadísticas de mazo
+      operationId: getDeckStats
+      security:
+        - oauth2: [study.read]
+      responses:
+        "200":
+          description: Estadísticas del mazo
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeckStats"
+
+  /v1/notes:
+    get:
+      tags: [Notes]
+      summary: Listar notas
+      operationId: listNotes
+      security:
+        - oauth2: [study.read]
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Size"
+        - $ref: "#/components/parameters/Sort"
+        - in: query
+          name: deckId
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: noteType
+          schema:
+            $ref: "#/components/schemas/NoteType"
+        - in: query
+          name: tag
+          schema:
+            type: string
+        - in: query
+          name: search
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Página de notas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedNotes"
+    post:
+      tags: [Notes]
+      summary: Crear nota
+      operationId: createNote
+      security:
+        - oauth2: [study.write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NoteCreateRequest"
+      responses:
+        "201":
+          description: Nota creada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Note"
+
+  /v1/notes/{noteId}:
+    parameters:
+      - $ref: "#/components/parameters/NoteId"
+    get:
+      tags: [Notes]
+      summary: Obtener nota
+      operationId: getNote
+      security:
+        - oauth2: [study.read]
+      responses:
+        "200":
+          description: Nota
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Note"
+        "404":
+          $ref: "#/components/responses/NotFound"
+    patch:
+      tags: [Notes]
+      summary: Actualizar nota
+      operationId: patchNote
+      security:
+        - oauth2: [study.write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/NotePatchRequest"
+      responses:
+        "200":
+          description: Nota actualizada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Note"
+    delete:
+      tags: [Notes]
+      summary: Eliminar nota y sus tarjetas derivadas
+      operationId: deleteNote
+      security:
+        - oauth2: [study.write]
+      responses:
+        "204":
+          description: Nota eliminada
+
+  /v1/notes/{noteId}/cards:
+    parameters:
+      - $ref: "#/components/parameters/NoteId"
+    get:
+      tags: [Notes, Cards]
+      summary: Listar tarjetas derivadas de una nota
+      operationId: listCardsByNote
+      security:
+        - oauth2: [study.read]
+      responses:
+        "200":
+          description: Tarjetas de la nota
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Card"
+
+  /v1/cards:
+    get:
+      tags: [Cards]
+      summary: Listar tarjetas
+      operationId: listCards
+      security:
+        - oauth2: [study.read]
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Size"
+        - $ref: "#/components/parameters/Sort"
+        - in: query
+          name: deckId
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: dueBefore
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: suspended
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Página de tarjetas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedCards"
+
+  /v1/cards/due:
+    get:
+      tags: [Cards, Reviews]
+      summary: Obtener tarjetas debidas
+      operationId: getDueCards
+      security:
+        - oauth2: [study.read]
+      parameters:
+        - in: query
+          name: deckId
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: limit
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 20
+      responses:
+        "200":
+          description: Tarjetas debidas
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/Card"
+
+  /v1/cards/{cardId}:
+    parameters:
+      - $ref: "#/components/parameters/CardId"
+    get:
+      tags: [Cards]
+      summary: Obtener tarjeta
+      operationId: getCard
+      security:
+        - oauth2: [study.read]
+      responses:
+        "200":
+          description: Tarjeta
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Card"
+    patch:
+      tags: [Cards]
+      summary: Actualizar estado o metadatos de tarjeta
+      operationId: patchCard
+      security:
+        - oauth2: [study.write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CardPatchRequest"
+      responses:
+        "200":
+          description: Tarjeta actualizada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Card"
+    delete:
+      tags: [Cards]
+      summary: Eliminar tarjeta
+      operationId: deleteCard
+      security:
+        - oauth2: [study.write]
+      responses:
+        "204":
+          description: Tarjeta eliminada
+
+  /v1/cards/{cardId}/preview:
+    parameters:
+      - $ref: "#/components/parameters/CardId"
+    get:
+      tags: [Cards]
+      summary: Previsualizar render de tarjeta
+      operationId: previewCard
+      security:
+        - oauth2: [study.read]
+      responses:
+        "200":
+          description: Preview de tarjeta
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CardPreview"
+
+  /v1/review-sessions:
+    get:
+      tags: [Reviews]
+      summary: Listar sesiones de revisión
+      operationId: listReviewSessions
+      security:
+        - oauth2: [study.read]
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Size"
+        - $ref: "#/components/parameters/Sort"
+      responses:
+        "200":
+          description: Sesiones
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedReviewSessions"
+    post:
+      tags: [Reviews]
+      summary: Iniciar sesión de revisión
+      operationId: createReviewSession
+      security:
+        - oauth2: [review.write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReviewSessionCreateRequest"
+      responses:
+        "201":
+          description: Sesión iniciada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewSession"
+
+  /v1/review-sessions/{sessionId}:
+    parameters:
+      - $ref: "#/components/parameters/SessionId"
+    get:
+      tags: [Reviews]
+      summary: Obtener sesión de revisión
+      operationId: getReviewSession
+      security:
+        - oauth2: [study.read]
+      responses:
+        "200":
+          description: Sesión
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReviewSession"
+
+  /v1/review-sessions/{sessionId}/next:
+    parameters:
+      - $ref: "#/components/parameters/SessionId"
+    get:
+      tags: [Reviews]
+      summary: Obtener siguiente tarjeta a presentar
+      operationId: getNextReviewCard
+      security:
+        - oauth2: [review.write]
+      responses:
+        "200":
+          description: Siguiente tarjeta
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/NextReviewCard"
+        "204":
+          description: No hay más tarjetas para la sesión
+
+  /v1/reviews:
+    post:
+      tags: [Reviews]
+      summary: Registrar respuesta de revisión y calcular siguiente scheduling
+      operationId: submitReview
+      security:
+        - oauth2: [review.write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ReviewSubmitRequest"
+      responses:
+        "200":
+          description: Resultado de FSRS/SM-2 normalizado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FSRSReviewResult"
+              examples:
+                fsrsResult:
+                  value:
+                    cardId: "4b2b0e1a-83cb-4202-9fa7-5da983e4c3a2"
+                    sessionId: "bb08b37b-25c0-4497-89ca-4ad03b2e718f"
+                    rating: "good"
+                    reviewedAt: "2026-06-19T15:31:00Z"
+                    previousState:
+                      dueAt: "2026-06-19T00:00:00Z"
+                      stability: 4.92
+                      difficulty: 5.61
+                      retrievability: 0.89
+                      elapsedDays: 5
+                      scheduledDays: 5
+                    nextState:
+                      dueAt: "2026-06-27T00:00:00Z"
+                      stability: 8.32
+                      difficulty: 5.44
+                      desiredRetention: 0.9
+                      scheduledDays: 8
+                    historyEntryId: "0e6c91e4-fbc4-430a-95d4-4b14ffce7a1d"
+
+  /v1/reviews/history:
+    get:
+      tags: [Reviews]
+      summary: Consultar historial de revisiones
+      operationId: listReviewHistory
+      security:
+        - oauth2: [study.read]
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Size"
+        - in: query
+          name: deckId
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: cardId
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: from
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: to
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: Historial paginado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedReviewLogs"
+
+  /v1/ai/generate-flashcards:
+    post:
+      tags: [AI]
+      summary: Generar tarjetas con IA usando salida estructurada
+      operationId: generateFlashcards
+      security:
+        - oauth2: [ai.generate]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/GenerateFlashcardsRequest"
+      responses:
+        "200":
+          description: Resultado estructurado de generación
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GenerateFlashcardsResponse"
+
+  /v1/ai/improve-flashcard:
+    post:
+      tags: [AI]
+      summary: Mejorar una flashcard existente o propuesta
+      operationId: improveFlashcard
+      security:
+        - oauth2: [ai.generate]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImproveFlashcardRequest"
+      responses:
+        "200":
+          description: Flashcard mejorada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImproveFlashcardResponse"
+
+  /v1/documents:
+    get:
+      tags: [Documents]
+      summary: Listar documentos
+      operationId: listDocuments
+      security:
+        - oauth2: [documents.read]
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Size"
+        - in: query
+          name: ingestStatus
+          schema:
+            $ref: "#/components/schemas/IngestStatus"
+      responses:
+        "200":
+          description: Página de documentos
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedDocuments"
+    post:
+      tags: [Documents]
+      summary: Registrar documento o texto base para RAG
+      operationId: createDocument
+      security:
+        - oauth2: [documents.write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DocumentCreateRequest"
+      responses:
+        "201":
+          description: Documento creado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+
+  /v1/documents/{documentId}:
+    parameters:
+      - $ref: "#/components/parameters/DocumentId"
+    get:
+      tags: [Documents]
+      summary: Obtener documento
+      operationId: getDocument
+      security:
+        - oauth2: [documents.read]
+      responses:
+        "200":
+          description: Documento
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Document"
+    delete:
+      tags: [Documents]
+      summary: Eliminar documento
+      operationId: deleteDocument
+      security:
+        - oauth2: [documents.write]
+      responses:
+        "204":
+          description: Documento eliminado
+
+  /v1/documents/{documentId}/ingest:
+    parameters:
+      - $ref: "#/components/parameters/DocumentId"
+    post:
+      tags: [Documents, RAG]
+      summary: Ingerir documento en pipeline RAG
+      operationId: ingestDocument
+      security:
+        - oauth2: [documents.write]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RagIngestRequest"
+            examples:
+              ingestRequest:
+                value:
+                  chunking:
+                    strategy: "token"
+                    targetSize: 400
+                    overlap: 40
+                  embeddingProvider: "openai:text-embedding-3-large"
+                  metadata:
+                    course: "biologia"
+                    source: "apuntes-clase-1"
+      responses:
+        "202":
+          description: Ingesta aceptada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/IngestJob"
+
+  /v1/documents/{documentId}/chunks:
+    parameters:
+      - $ref: "#/components/parameters/DocumentId"
+    get:
+      tags: [Documents]
+      summary: Listar chunks derivados de un documento
+      operationId: listDocumentChunks
+      security:
+        - oauth2: [documents.read]
+      responses:
+        "200":
+          description: Chunks del documento
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedChunks"
+
+  /v1/chunks:
+    get:
+      tags: [Documents]
+      summary: Buscar chunks
+      operationId: listChunks
+      security:
+        - oauth2: [documents.read]
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Size"
+        - in: query
+          name: documentId
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: search
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Página de chunks
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedChunks"
+
+  /v1/embeddings:
+    get:
+      tags: [Documents]
+      summary: Consultar metadata de embeddings
+      operationId: listEmbeddings
+      security:
+        - oauth2: [documents.read]
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Size"
+      responses:
+        "200":
+          description: Embeddings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedEmbeddingMeta"
+
+  /v1/rag/search:
+    post:
+      tags: [RAG]
+      summary: Búsqueda semántica sobre documentos del usuario
+      operationId: ragSearch
+      security:
+        - oauth2: [rag.query]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RagSearchRequest"
+      responses:
+        "200":
+          description: Resultado de búsqueda semántica
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RagSearchResponse"
+
+  /v1/rag/chat:
+    post:
+      tags: [RAG]
+      summary: Chat contextual con RAG
+      operationId: ragChat
+      security:
+        - oauth2: [rag.query]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RagChatRequest"
+      responses:
+        "200":
+          description: Respuesta del chat con fuentes
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RagChatResponse"
+
+  "/v1/imports/flashcards:validate":
+    post:
+      tags: [ImportExport]
+      summary: Validar payload JSON de importación sin persistir
+      operationId: validateFlashcardImport
+      security:
+        - oauth2: [import.write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FlashcardImportV1"
+      responses:
+        "200":
+          description: Resultado de validación
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportValidationResponse"
+
+  "/v1/imports/flashcards:preview":
+    post:
+      tags: [ImportExport]
+      summary: Vista previa de importación con warnings y duplicados
+      operationId: previewFlashcardImport
+      security:
+        - oauth2: [import.write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FlashcardImportV1"
+      responses:
+        "200":
+          description: Preview de importación
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportPreview"
+
+  /v1/imports/flashcards:
+    post:
+      tags: [ImportExport]
+      summary: Importar flashcards desde JSON estructurado
+      operationId: importFlashcards
+      security:
+        - oauth2: [import.write]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/FlashcardImportV1"
+            examples:
+              importJson:
+                value:
+                  schemaVersion: "1.0"
+                  deck:
+                    title: "Biología celular"
+                    description: "Organelos y procesos"
+                    tags: ["biologia", "celula"]
+                  notes:
+                    - noteType: "basic"
+                      front: "¿Cuál es la función principal de la mitocondria?"
+                      back: "Producir ATP."
+                      tags: ["organelos", "energia"]
+                    - noteType: "reversed"
+                      front: "Nucleus"
+                      back: "Núcleo"
+                      tags: ["vocabulario"]
+                    - noteType: "cloze"
+                      text: "La {{c1::mitocondria}} produce {{c2::ATP}}."
+                      tags: ["cloze"]
+                    - noteType: "multiple-choice"
+                      question: "¿Cuál organelo contiene ADN propio?"
+                      options:
+                        - key: "A"
+                          text: "Lisosoma"
+                        - key: "B"
+                          text: "Mitocondria"
+                        - key: "C"
+                          text: "Ribosoma"
+                        - key: "D"
+                          text: "Peroxisoma"
+                      correctOptionKeys: ["B"]
+                      explanation: "La mitocondria conserva ADN propio."
+                    - noteType: "free-text"
+                      prompt: "Explica en una frase qué hace el aparato de Golgi."
+                      expectedAnswer: "Modifica, empaqueta y distribuye proteínas y lípidos."
+      responses:
+        "201":
+          description: Importación creada
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ImportResult"
+        "422":
+          $ref: "#/components/responses/UnprocessableEntity"
+
+  /v1/exports/decks/{deckId}.json:
+    parameters:
+      - $ref: "#/components/parameters/DeckId"
+    get:
+      tags: [ImportExport]
+      summary: Exportar mazo a JSON versionado
+      operationId: exportDeckJson
+      security:
+        - oauth2: [export.read]
+      responses:
+        "200":
+          description: JSON exportado
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FlashcardImportV1"
+
+  /v1/mcp/tools:
+    get:
+      tags: [MCP]
+      summary: Listar herramientas MCP publicadas por la aplicación
+      operationId: listMcpTools
+      security:
+        - oauth2: [mcp.invoke]
+        - apiKey: []
+      responses:
+        "200":
+          description: Herramientas MCP
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/McpToolDescriptor"
+
+  "/v1/mcp/tools/{toolName}:invoke":
+    parameters:
+      - in: path
+        name: toolName
+        required: true
+        schema:
+          type: string
+    post:
+      tags: [MCP]
+      summary: Invocar herramienta MCP vía wrapper REST
+      operationId: invokeMcpTool
+      security:
+        - oauth2: [mcp.invoke]
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/McpInvokeRequest"
+            examples:
+              createDeck:
+                value:
+                  arguments:
+                    title: "Anatomía"
+                    description: "Mazo creado por agente"
+              importFlashcards:
+                value:
+                  arguments:
+                    schemaVersion: "1.0"
+                    deck:
+                      title: "Historia"
+                    notes:
+                      - noteType: "basic"
+                        front: "¿En qué año comenzó la Revolución Francesa?"
+                        back: "1789"
+      responses:
+        "200":
+          description: Resultado de invocación
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/McpInvokeResponse"
+
+  /v1/mcp/resources:
+    get:
+      tags: [MCP]
+      summary: Listar recursos MCP discoverables
+      operationId: listMcpResources
+      security:
+        - oauth2: [mcp.invoke]
+        - apiKey: []
+      responses:
+        "200":
+          description: Recursos MCP
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/McpResourceDescriptor"
+
+  /v1/mcp/prompts:
+    get:
+      tags: [MCP]
+      summary: Listar prompts MCP discoverables
+      operationId: listMcpPrompts
+      security:
+        - oauth2: [mcp.invoke]
+        - apiKey: []
+      responses:
+        "200":
+          description: Prompts MCP
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: "#/components/schemas/McpPromptDescriptor"
+
+  /mcp:
+    get:
+      tags: [MCP]
+      summary: Endpoint MCP Streamable HTTP para mensajes del servidor y discovery
+      operationId: mcpGet
+      description: Endpoint MCP transport-level. Mantener separado de la REST API de negocio.
+      security:
+        - oauth2: [mcp.invoke]
+        - apiKey: []
+      responses:
+        "200":
+          description: Respuesta MCP HTTP GET
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/McpHttpEnvelope"
+    post:
+      tags: [MCP]
+      summary: Endpoint MCP Streamable HTTP para requests tool/resource/prompt
+      operationId: mcpPost
+      security:
+        - oauth2: [mcp.invoke]
+        - apiKey: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/McpHttpEnvelope"
+      responses:
+        "200":
+          description: Respuesta MCP HTTP POST
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/McpHttpEnvelope"
+
+  /v1/skills/agent:
+    get:
+      tags: [Skills]
+      summary: Obtener skill para agentes IA
+      operationId: getAgentSkill
+      security:
+        - oauth2: [study.read]
+      responses:
+        "200":
+          description: Skill markdown o JSON
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SkillDocument"
+
+  /v1/skills/cli:
+    get:
+      tags: [Skills]
+      summary: Obtener catálogo CLI y ayuda machine-readable
+      operationId: getCliSkill
+      security:
+        - oauth2: [study.read]
+      responses:
+        "200":
+          description: Catálogo CLI
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CliCommandCatalog"
+
+  /v1/admin/audit-logs:
+    get:
+      tags: [Admin]
+      summary: Consultar logs de auditoría de negocio
+      operationId: listAuditLogs
+      security:
+        - oauth2: [audit.read]
+      parameters:
+        - $ref: "#/components/parameters/Page"
+        - $ref: "#/components/parameters/Size"
+        - in: query
+          name: actorId
+          schema:
+            type: string
+            format: uuid
+        - in: query
+          name: action
+          schema:
+            type: string
+        - in: query
+          name: resourceType
+          schema:
+            type: string
+        - in: query
+          name: from
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: to
+          schema:
+            type: string
+            format: date-time
+      responses:
+        "200":
+          description: Auditoría
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PagedAuditLogs"
+
+  /v1/admin/rate-limits:
+    get:
+      tags: [Admin]
+      summary: Consultar estado de rate limits por principal o clientId
+      operationId: getRateLimits
+      security:
+        - oauth2: [admin.read]
+      parameters:
+        - in: query
+          name: principal
+          schema:
+            type: string
+        - in: query
+          name: clientId
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Estado de rate limiting
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/RateLimitStatus"
+
+  /v1/ops/traces/{traceId}:
+    parameters:
+      - in: path
+        name: traceId
+        required: true
+        schema:
+          type: string
+    get:
+      tags: [Observability]
+      summary: Consultar resumen de una traza por traceId
+      operationId: getTrace
+      security:
+        - oauth2: [observability.read]
+      responses:
+        "200":
+          description: Resumen de traza
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TraceSummary"
+        "404":
+          $ref: "#/components/responses/NotFound"
+
+  /health:
+    get:
+      tags: [Observability]
+      summary: Alias simple de salud para balanceadores o gateways
+      operationId: healthAlias
+      responses:
+        "200":
+          description: Salud resumida
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /metrics:
+    get:
+      tags: [Observability]
+      summary: Alias opcional de métricas Prometheus
+      operationId: metricsAlias
+      security:
+        - oauth2: [observability.read]
+      responses:
+        "200":
+          description: Scrape Prometheus
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /actuator/health:
+    get:
+      tags: [Observability]
+      summary: Health Actuator
+      operationId: actuatorHealth
+      responses:
+        "200":
+          description: Health actuator
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthResponse"
+
+  /actuator/info:
+    get:
+      tags: [Observability]
+      summary: Info Actuator
+      operationId: actuatorInfo
+      security:
+        - oauth2: [observability.read]
+      responses:
+        "200":
+          description: Info
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+  /actuator/metrics:
+    get:
+      tags: [Observability]
+      summary: Nombres de métricas registradas
+      operationId: actuatorMetrics
+      security:
+        - oauth2: [observability.read]
+      responses:
+        "200":
+          description: Catálogo de métricas
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MetricCatalog"
+
+  /actuator/prometheus:
+    get:
+      tags: [Observability]
+      summary: Endpoint Prometheus scrape
+      operationId: actuatorPrometheus
+      security:
+        - oauth2: [observability.read]
+      responses:
+        "200":
+          description: Métricas Prometheus
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /actuator/logfile:
+    get:
+      tags: [Observability]
+      summary: Log file de la aplicación
+      operationId: actuatorLogfile
+      security:
+        - oauth2: [admin.read]
+      responses:
+        "200":
+          description: Log file
+          content:
+            text/plain:
+              schema:
+                type: string
+
+  /actuator/auditevents:
+    get:
+      tags: [Observability]
+      summary: Audit events de Spring Boot
+      operationId: actuatorAuditEvents
+      security:
+        - oauth2: [admin.read]
+      parameters:
+        - in: query
+          name: principal
+          schema:
+            type: string
+        - in: query
+          name: after
+          schema:
+            type: string
+            format: date-time
+        - in: query
+          name: type
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Eventos de auditoría
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties: true
+
+components:
+  securitySchemes:
+    oauth2:
+      type: oauth2
+      description: |
+        OAuth2/OIDC para JWT bearer tokens.
+        Vite/React SPA: authorizationCode + PKCE contra el IdP.
+        Service-to-service y automatización MCP: clientCredentials con scopes del IdP.
+        CLI interactivo: Device Authorization Grant documentado en el IdP.
+        API keys son una alternativa machine-readable separada para automatización/MCP cuando no hay identidad de usuario final.
+      flows:
+        authorizationCode:
+          authorizationUrl: https://auth.studydeck.ai/oauth2/authorize
+          tokenUrl: https://auth.studydeck.ai/oauth2/token
+          refreshUrl: https://auth.studydeck.ai/oauth2/token
+          scopes:
+            openid: Identidad OIDC
+            profile: Perfil del usuario
+            email: Email del usuario
+            study.read: Lectura de estudio
+            study.write: Escritura de estudio
+            review.write: Revisión
+            documents.read: Lectura de documentos
+            documents.write: Escritura de documentos
+            rag.query: Consultas RAG
+            ai.generate: Generación IA
+            import.write: Importación JSON
+            export.read: Exportación
+            mcp.invoke: Invocar MCP
+            admin.read: Lectura administrativa
+            admin.write: Escritura administrativa
+            audit.read: Lectura de auditoría
+            observability.read: Lectura de observabilidad
+        clientCredentials:
+          tokenUrl: https://auth.studydeck.ai/oauth2/token
+          scopes:
+            study.read: Lectura de estudio
+            study.write: Escritura de estudio
+            documents.read: Lectura de documentos
+            documents.write: Escritura de documentos
+            rag.query: Consultas RAG
+            ai.generate: Generación IA
+            import.write: Importación JSON
+            export.read: Exportación
+            mcp.invoke: Invocar MCP
+            admin.read: Lectura administrativa
+    openId:
+      type: openIdConnect
+      openIdConnectUrl: https://auth.studydeck.ai/.well-known/openid-configuration
+    apiKey:
+      type: apiKey
+      in: header
+      name: X-StudyDeck-API-Key
+      description: |
+        API key scoped for service clients, CI jobs and MCP automation.
+        It must be hashed at rest, revocable, expiring, audited, and mapped server-side to least-privilege scopes.
+        Browser clients must use OIDC Authorization Code + PKCE instead.
+
+  parameters:
+    Page:
+      in: query
+      name: page
+      description: Índice de página basado en offset
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+    Size:
+      in: query
+      name: size
+      description: Tamaño de página
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    Sort:
+      in: query
+      name: sort
+      description: Campo y dirección, por ejemplo createdAt,asc
+      schema:
+        type: string
+        default: createdAt,asc
+    UserId:
+      in: path
+      name: userId
+      required: true
+      schema:
+        type: string
+        format: uuid
+    DeckId:
+      in: path
+      name: deckId
+      required: true
+      schema:
+        type: string
+        format: uuid
+    NoteId:
+      in: path
+      name: noteId
+      required: true
+      schema:
+        type: string
+        format: uuid
+    CardId:
+      in: path
+      name: cardId
+      required: true
+      schema:
+        type: string
+        format: uuid
+    SessionId:
+      in: path
+      name: sessionId
+      required: true
+      schema:
+        type: string
+        format: uuid
+    DocumentId:
+      in: path
+      name: documentId
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  responses:
+    BadRequest:
+      description: Request inválida
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    Unauthorized:
+      description: No autenticado
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    Forbidden:
+      description: No autorizado
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    NotFound:
+      description: No encontrado
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    Conflict:
+      description: Conflicto
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    TooManyRequests:
+      description: Rate limit excedido
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+    UnprocessableEntity:
+      description: Error semántico o validación de dominio
+      content:
+        application/problem+json:
+          schema:
+            $ref: "#/components/schemas/Problem"
+
+  schemas:
+    Problem:
+      type: object
+      additionalProperties: true
+      required: [type, title, status]
+      properties:
+        type:
+          type: string
+          format: uri-reference
+          default: about:blank
+        title:
+          type: string
+        status:
+          type: integer
+        detail:
+          type: string
+        instance:
+          type: string
+          format: uri-reference
+        code:
+          type: string
+        requestId:
+          type: string
+        traceId:
+          type: string
+        violations:
+          type: array
+          items:
+            $ref: "#/components/schemas/Violation"
+
+    Violation:
+      type: object
+      required: [field, message]
+      properties:
+        field:
+          type: string
+        message:
+          type: string
+        code:
+          type: string
+
+    PageMeta:
+      type: object
+      required: [page, size, totalElements, totalPages]
+      properties:
+        page:
+          type: integer
+        size:
+          type: integer
+        totalElements:
+          type: integer
+        totalPages:
+          type: integer
+        hasNext:
+          type: boolean
+        hasPrevious:
+          type: boolean
+
+    AuditFields:
+      type: object
+      required: [createdAt, updatedAt]
+      properties:
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+        createdBy:
+          type: string
+          format: uuid
+        updatedBy:
+          type: string
+          format: uuid
+
+    Role:
+      type: string
+      enum:
+        - ROLE_USER
+        - ROLE_ADMIN
+        - ROLE_SUPPORT
+        - ROLE_SERVICE_MCP
+        - ROLE_SERVICE_CLI
+
+    NoteType:
+      type: string
+      enum:
+        - basic
+        - reversed
+        - cloze
+        - multiple-choice
+        - free-text
+
+    ReviewRating:
+      type: string
+      enum: [again, hard, good, easy]
+
+    IngestStatus:
+      type: string
+      enum: [registered, pending, processing, completed, failed]
+
+    AuthPrincipal:
+      allOf:
+        - $ref: "#/components/schemas/AuditFields"
+        - type: object
+          required: [id, subject, email, roles, scopes]
+          properties:
+            id:
+              type: string
+              format: uuid
+            subject:
+              type: string
+            email:
+              type: string
+              format: email
+            displayName:
+              type: string
+            roles:
+              type: array
+              items:
+                $ref: "#/components/schemas/Role"
+            scopes:
+              type: array
+              items:
+                type: string
+            requestId:
+              type: string
+            traceId:
+              type: string
+
+    User:
+      allOf:
+        - $ref: "#/components/schemas/AuditFields"
+        - type: object
+          required: [id, email, roles, active]
+          properties:
+            id:
+              type: string
+              format: uuid
+            email:
+              type: string
+              format: email
+            displayName:
+              type: string
+            roles:
+              type: array
+              items:
+                $ref: "#/components/schemas/Role"
+            active:
+              type: boolean
+            externalSubject:
+              type: string
+
+    UserCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [email, roles]
+      properties:
+        email:
+          type: string
+          format: email
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 120
+        roles:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/Role"
+
+    UserPatchRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        displayName:
+          type: string
+          minLength: 1
+          maxLength: 120
+        roles:
+          type: array
+          minItems: 1
+          items:
+            $ref: "#/components/schemas/Role"
+        active:
+          type: boolean
+
+    PagedUsers:
+      type: object
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/User"
+        page:
+          $ref: "#/components/schemas/PageMeta"
+
+    Deck:
+      allOf:
+        - $ref: "#/components/schemas/AuditFields"
+        - type: object
+          required: [id, title, archived]
+          properties:
+            id:
+              type: string
+              format: uuid
+            title:
+              type: string
+              minLength: 1
+              maxLength: 120
+            description:
+              type: string
+              maxLength: 1000
+            tags:
+              type: array
+              items:
+                type: string
+            archived:
+              type: boolean
+            defaultDesiredRetention:
+              type: number
+              minimum: 0.7
+              maximum: 0.99
+              default: 0.9
+
+    DeckCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [title]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 120
+        description:
+          type: string
+          maxLength: 1000
+        tags:
+          type: array
+          maxItems: 50
+          items:
+            type: string
+        defaultDesiredRetention:
+          type: number
+          minimum: 0.7
+          maximum: 0.99
+          default: 0.9
+
+    DeckPatchRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 120
+        description:
+          type: string
+          maxLength: 1000
+        archived:
+          type: boolean
+        tags:
+          type: array
+          items:
+            type: string
+        defaultDesiredRetention:
+          type: number
+          minimum: 0.7
+          maximum: 0.99
+
+    DeckStats:
+      type: object
+      required:
+        [deckId, totalNotes, totalCards, dueToday, reviewedToday, suspendedCards]
+      properties:
+        deckId:
+          type: string
+          format: uuid
+        totalNotes:
+          type: integer
+        totalCards:
+          type: integer
+        dueToday:
+          type: integer
+        reviewedToday:
+          type: integer
+        suspendedCards:
+          type: integer
+        againRate7d:
+          type: number
+        averageRetention30d:
+          type: number
+
+    PagedDecks:
+      type: object
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Deck"
+        page:
+          $ref: "#/components/schemas/PageMeta"
+
+    NoteTypeDescriptor:
+      type: object
+      required: [name, label, fields]
+      properties:
+        name:
+          $ref: "#/components/schemas/NoteType"
+        label:
+          type: string
+        fields:
+          type: array
+          items:
+            type: string
+        guidance:
+          type: string
+        secondary:
+          type: boolean
+
+    SourceLink:
+      type: object
+      additionalProperties: false
+      properties:
+        sourceType:
+          type: string
+          enum: [manual, document, rag, ai-generated, import-json, mcp, cli]
+        documentId:
+          type: string
+          format: uuid
+        chunkIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        reference:
+          type: string
+
+    BasicNoteContent:
+      type: object
+      additionalProperties: false
+      required: [front, back]
+      properties:
+        front:
+          type: string
+          minLength: 1
+          maxLength: 1000
+        back:
+          type: string
+          minLength: 1
+          maxLength: 5000
+
+    ReversedNoteContent:
+      type: object
+      additionalProperties: false
+      required: [front, back]
+      properties:
+        front:
+          type: string
+          minLength: 1
+          maxLength: 1000
+        back:
+          type: string
+          minLength: 1
+          maxLength: 5000
+
+    ClozeNoteContent:
+      type: object
+      additionalProperties: false
+      required: [text]
+      properties:
+        text:
+          type: string
+          minLength: 1
+          maxLength: 5000
+          pattern: ".*\\{\\{c[0-9]+::.+\\}\\}.*"
+
+    MultipleChoiceOption:
+      type: object
+      required: [key, text]
+      properties:
+        key:
+          type: string
+          pattern: "^[A-Z]$"
+        text:
+          type: string
+          minLength: 1
+          maxLength: 1000
+
+    MultipleChoiceNoteContent:
+      type: object
+      additionalProperties: false
+      required: [question, options, correctOptionKeys]
+      properties:
+        question:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        options:
+          type: array
+          minItems: 4
+          maxItems: 5
+          description: Multiple Choice P0 permite exactamente variantes ABCD o ABCDE.
+          items:
+            $ref: "#/components/schemas/MultipleChoiceOption"
+        correctOptionKeys:
+          type: array
+          minItems: 1
+          maxItems: 1
+          uniqueItems: true
+          description: Debe contener exactamente una opción correcta.
+          items:
+            type: string
+            pattern: "^[A-Z]$"
+        explanation:
+          type: string
+          maxLength: 5000
+
+    FreeTextNoteContent:
+      type: object
+      additionalProperties: false
+      required: [prompt, expectedAnswer]
+      properties:
+        prompt:
+          type: string
+          minLength: 1
+          maxLength: 2000
+        expectedAnswer:
+          type: string
+          minLength: 1
+          maxLength: 5000
+        gradingGuidance:
+          type: string
+          maxLength: 2000
+
+    Note:
+      allOf:
+        - $ref: "#/components/schemas/AuditFields"
+        - type: object
+          required: [id, deckId, noteType, tags]
+          properties:
+            id:
+              type: string
+              format: uuid
+            deckId:
+              type: string
+              format: uuid
+            noteType:
+              $ref: "#/components/schemas/NoteType"
+            tags:
+              type: array
+              items:
+                type: string
+            source:
+              $ref: "#/components/schemas/SourceLink"
+            content:
+              oneOf:
+                - $ref: "#/components/schemas/BasicNoteContent"
+                - $ref: "#/components/schemas/ReversedNoteContent"
+                - $ref: "#/components/schemas/ClozeNoteContent"
+                - $ref: "#/components/schemas/MultipleChoiceNoteContent"
+                - $ref: "#/components/schemas/FreeTextNoteContent"
+
+    NoteCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [deckId, noteType, content]
+      properties:
+        deckId:
+          type: string
+          format: uuid
+        noteType:
+          $ref: "#/components/schemas/NoteType"
+        tags:
+          type: array
+          items:
+            type: string
+        source:
+          $ref: "#/components/schemas/SourceLink"
+        content:
+          oneOf:
+            - $ref: "#/components/schemas/BasicNoteContent"
+            - $ref: "#/components/schemas/ReversedNoteContent"
+            - $ref: "#/components/schemas/ClozeNoteContent"
+            - $ref: "#/components/schemas/MultipleChoiceNoteContent"
+            - $ref: "#/components/schemas/FreeTextNoteContent"
+
+    NotePatchRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        tags:
+          type: array
+          items:
+            type: string
+        content:
+          oneOf:
+            - $ref: "#/components/schemas/BasicNoteContent"
+            - $ref: "#/components/schemas/ReversedNoteContent"
+            - $ref: "#/components/schemas/ClozeNoteContent"
+            - $ref: "#/components/schemas/MultipleChoiceNoteContent"
+            - $ref: "#/components/schemas/FreeTextNoteContent"
+
+    PagedNotes:
+      type: object
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Note"
+        page:
+          $ref: "#/components/schemas/PageMeta"
+
+    SchedulerState:
+      type: object
+      properties:
+        dueAt:
+          type: string
+          format: date-time
+        stability:
+          type: number
+        difficulty:
+          type: number
+        retrievability:
+          type: number
+        elapsedDays:
+          type: integer
+        scheduledDays:
+          type: integer
+        desiredRetention:
+          type: number
+
+    Card:
+      allOf:
+        - $ref: "#/components/schemas/AuditFields"
+        - type: object
+          required: [id, noteId, deckId, noteType, suspended]
+          properties:
+            id:
+              type: string
+              format: uuid
+            noteId:
+              type: string
+              format: uuid
+            deckId:
+              type: string
+              format: uuid
+            noteType:
+              $ref: "#/components/schemas/NoteType"
+            cardVariant:
+              type: string
+              description: Ej. forward, reverse, cloze-1, cloze-2, mcq, free-text
+            position:
+              type: integer
+            suspended:
+              type: boolean
+            dueAt:
+              type: string
+              format: date-time
+            schedulerState:
+              $ref: "#/components/schemas/SchedulerState"
+
+    CardPatchRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        suspended:
+          type: boolean
+        dueAt:
+          type: string
+          format: date-time
+
+    CardPreview:
+      type: object
+      required: [cardId, front, back]
+      properties:
+        cardId:
+          type: string
+          format: uuid
+        front:
+          type: string
+        back:
+          type: string
+        hint:
+          type: string
+
+    PagedCards:
+      type: object
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Card"
+        page:
+          $ref: "#/components/schemas/PageMeta"
+
+    ReviewSession:
+      allOf:
+        - $ref: "#/components/schemas/AuditFields"
+        - type: object
+          required: [id, status, startedAt]
+          properties:
+            id:
+              type: string
+              format: uuid
+            deckId:
+              type: string
+              format: uuid
+            status:
+              type: string
+              enum: [started, completed, abandoned]
+            startedAt:
+              type: string
+              format: date-time
+            endedAt:
+              type: string
+              format: date-time
+            presentedCount:
+              type: integer
+            answeredCount:
+              type: integer
+
+    ReviewSessionCreateRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        deckId:
+          type: string
+          format: uuid
+        maxCards:
+          type: integer
+          minimum: 1
+          maximum: 500
+          default: 20
+        includeLearning:
+          type: boolean
+          default: true
+
+    NextReviewCard:
+      type: object
+      required: [sessionId, card]
+      properties:
+        sessionId:
+          type: string
+          format: uuid
+        card:
+          $ref: "#/components/schemas/Card"
+
+    ReviewSubmitRequest:
+      type: object
+      additionalProperties: false
+      required: [cardId, rating]
+      properties:
+        sessionId:
+          type: string
+          format: uuid
+        cardId:
+          type: string
+          format: uuid
+        rating:
+          $ref: "#/components/schemas/ReviewRating"
+        responseTimeMs:
+          type: integer
+          minimum: 0
+        revealedAnswer:
+          type: boolean
+          default: true
+        clientPresentAt:
+          type: string
+          format: date-time
+
+    ReviewLog:
+      allOf:
+        - $ref: "#/components/schemas/AuditFields"
+        - type: object
+          required: [id, cardId, rating, reviewedAt]
+          properties:
+            id:
+              type: string
+              format: uuid
+            sessionId:
+              type: string
+              format: uuid
+            cardId:
+              type: string
+              format: uuid
+            rating:
+              $ref: "#/components/schemas/ReviewRating"
+            reviewedAt:
+              type: string
+              format: date-time
+            responseTimeMs:
+              type: integer
+            schedulerSnapshot:
+              $ref: "#/components/schemas/FSRSReviewResult"
+
+    PagedReviewSessions:
+      type: object
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReviewSession"
+        page:
+          $ref: "#/components/schemas/PageMeta"
+
+    PagedReviewLogs:
+      type: object
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/ReviewLog"
+        page:
+          $ref: "#/components/schemas/PageMeta"
+
+    FSRSReviewResult:
+      type: object
+      required: [cardId, rating, reviewedAt, previousState, nextState]
+      properties:
+        cardId:
+          type: string
+          format: uuid
+        sessionId:
+          type: string
+          format: uuid
+        rating:
+          $ref: "#/components/schemas/ReviewRating"
+        reviewedAt:
+          type: string
+          format: date-time
+        previousState:
+          $ref: "#/components/schemas/SchedulerState"
+        nextState:
+          $ref: "#/components/schemas/SchedulerState"
+        historyEntryId:
+          type: string
+          format: uuid
+
+    GenerateFlashcardsRequest:
+      type: object
+      additionalProperties: false
+      required: [source]
+      properties:
+        deckId:
+          type: string
+          format: uuid
+        source:
+          type: object
+          required: [type, content]
+          properties:
+            type:
+              type: string
+              enum: [text, document, rag-context]
+            content:
+              type: string
+            documentIds:
+              type: array
+              items:
+                type: string
+                format: uuid
+        preferredTypes:
+          type: array
+          items:
+            $ref: "#/components/schemas/NoteType"
+        maxItems:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 10
+        language:
+          type: string
+          default: es
+        difficulty:
+          type: string
+          enum: [easy, medium, hard]
+
+    GenerateFlashcardsResponse:
+      type: object
+      required: [generated]
+      properties:
+        generated:
+          type: array
+          items:
+            $ref: "#/components/schemas/GeneratedFlashcardDraft"
+        warnings:
+          type: array
+          items:
+            type: string
+
+    GeneratedFlashcardDraft:
+      type: object
+      required: [noteType, content]
+      properties:
+        noteType:
+          $ref: "#/components/schemas/NoteType"
+        tags:
+          type: array
+          items:
+            type: string
+        content:
+          oneOf:
+            - $ref: "#/components/schemas/BasicNoteContent"
+            - $ref: "#/components/schemas/ReversedNoteContent"
+            - $ref: "#/components/schemas/ClozeNoteContent"
+            - $ref: "#/components/schemas/MultipleChoiceNoteContent"
+            - $ref: "#/components/schemas/FreeTextNoteContent"
+        rationale:
+          type: string
+        source:
+          $ref: "#/components/schemas/SourceLink"
+
+    ImproveFlashcardRequest:
+      type: object
+      additionalProperties: false
+      required: [noteType, content]
+      properties:
+        noteType:
+          $ref: "#/components/schemas/NoteType"
+        content:
+          oneOf:
+            - $ref: "#/components/schemas/BasicNoteContent"
+            - $ref: "#/components/schemas/ReversedNoteContent"
+            - $ref: "#/components/schemas/ClozeNoteContent"
+            - $ref: "#/components/schemas/MultipleChoiceNoteContent"
+            - $ref: "#/components/schemas/FreeTextNoteContent"
+        objective:
+          type: string
+          enum: [clarity, brevity, memorability, distractors, active-recall]
+        preserveMeaning:
+          type: boolean
+          default: true
+
+    ImproveFlashcardResponse:
+      type: object
+      required: [noteType, content]
+      properties:
+        noteType:
+          $ref: "#/components/schemas/NoteType"
+        content:
+          oneOf:
+            - $ref: "#/components/schemas/BasicNoteContent"
+            - $ref: "#/components/schemas/ReversedNoteContent"
+            - $ref: "#/components/schemas/ClozeNoteContent"
+            - $ref: "#/components/schemas/MultipleChoiceNoteContent"
+            - $ref: "#/components/schemas/FreeTextNoteContent"
+        explanation:
+          type: string
+
+    Document:
+      allOf:
+        - $ref: "#/components/schemas/AuditFields"
+        - type: object
+          required: [id, title, sourceType, ingestStatus]
+          properties:
+            id:
+              type: string
+              format: uuid
+            title:
+              type: string
+            sourceType:
+              type: string
+              enum: [upload, pasted-text, url, import-json]
+            mimeType:
+              type: string
+            sizeBytes:
+              type: integer
+            originalFilename:
+              type: string
+            textContent:
+              type: string
+            ingestStatus:
+              $ref: "#/components/schemas/IngestStatus"
+            metadata:
+              type: object
+              additionalProperties: true
+
+    DocumentCreateRequest:
+      type: object
+      additionalProperties: false
+      required: [title, sourceType]
+      properties:
+        title:
+          type: string
+          minLength: 1
+          maxLength: 255
+        sourceType:
+          type: string
+          enum: [upload, pasted-text, url]
+        mimeType:
+          type: string
+        originalFilename:
+          type: string
+        textContent:
+          type: string
+        externalUrl:
+          type: string
+          format: uri
+        metadata:
+          type: object
+          additionalProperties: true
+
+    Chunk:
+      type: object
+      required: [id, documentId, ordinal, content]
+      properties:
+        id:
+          type: string
+          format: uuid
+        documentId:
+          type: string
+          format: uuid
+        ordinal:
+          type: integer
+        tokenCount:
+          type: integer
+        content:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+
+    EmbeddingMeta:
+      type: object
+      required: [id, chunkId, provider, model, dimensions]
+      properties:
+        id:
+          type: string
+          format: uuid
+        chunkId:
+          type: string
+          format: uuid
+        provider:
+          type: string
+        model:
+          type: string
+        dimensions:
+          type: integer
+        createdAt:
+          type: string
+          format: date-time
+
+    PagedDocuments:
+      type: object
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Document"
+        page:
+          $ref: "#/components/schemas/PageMeta"
+
+    PagedChunks:
+      type: object
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Chunk"
+        page:
+          $ref: "#/components/schemas/PageMeta"
+
+    PagedEmbeddingMeta:
+      type: object
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/EmbeddingMeta"
+        page:
+          $ref: "#/components/schemas/PageMeta"
+
+    RagIngestRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        chunking:
+          type: object
+          properties:
+            strategy:
+              type: string
+              enum: [token, sentence, paragraph]
+              default: token
+            targetSize:
+              type: integer
+              minimum: 50
+              maximum: 2000
+              default: 400
+            overlap:
+              type: integer
+              minimum: 0
+              maximum: 500
+              default: 40
+        embeddingProvider:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+
+    IngestJob:
+      type: object
+      required: [jobId, documentId, status]
+      properties:
+        jobId:
+          type: string
+          format: uuid
+        documentId:
+          type: string
+          format: uuid
+        status:
+          $ref: "#/components/schemas/IngestStatus"
+
+    RagSearchRequest:
+      type: object
+      additionalProperties: false
+      required: [query]
+      properties:
+        query:
+          type: string
+          minLength: 1
+          maxLength: 4000
+        topK:
+          type: integer
+          minimum: 1
+          maximum: 50
+          default: 5
+        documentIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        minScore:
+          type: number
+          minimum: 0
+          maximum: 1
+        includeContent:
+          type: boolean
+          default: true
+
+    RagSearchHit:
+      type: object
+      required: [chunkId, documentId, score]
+      properties:
+        chunkId:
+          type: string
+          format: uuid
+        documentId:
+          type: string
+          format: uuid
+        score:
+          type: number
+        content:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+
+    RagSearchResponse:
+      type: object
+      required: [hits]
+      properties:
+        hits:
+          type: array
+          items:
+            $ref: "#/components/schemas/RagSearchHit"
+
+    RagChatRequest:
+      type: object
+      additionalProperties: false
+      required: [message]
+      properties:
+        message:
+          type: string
+          minLength: 1
+          maxLength: 4000
+        documentIds:
+          type: array
+          items:
+            type: string
+            format: uuid
+        topK:
+          type: integer
+          minimum: 1
+          maximum: 20
+          default: 5
+        stream:
+          type: boolean
+          default: false
+
+    RagChatResponse:
+      type: object
+      required: [answer, citations]
+      properties:
+        answer:
+          type: string
+        citations:
+          type: array
+          items:
+            $ref: "#/components/schemas/RagSearchHit"
+
+    FlashcardImportV1:
+      $schema: https://json-schema.org/draft/2020-12/schema
+      type: object
+      additionalProperties: false
+      required: [schemaVersion, deck, notes]
+      properties:
+        schemaVersion:
+          type: string
+          const: "1.0"
+        deck:
+          type: object
+          additionalProperties: false
+          required: [title]
+          properties:
+            title:
+              type: string
+              minLength: 1
+              maxLength: 120
+            description:
+              type: string
+              maxLength: 1000
+            tags:
+              type: array
+              items:
+                type: string
+        notes:
+          type: array
+          minItems: 1
+          maxItems: 5000
+          items:
+            $ref: "#/components/schemas/ImportNote"
+      examples:
+        - schemaVersion: "1.0"
+          deck:
+            title: "Ejemplo"
+          notes:
+            - noteType: "basic"
+              front: "Pregunta"
+              back: "Respuesta"
+
+    ImportNote:
+      oneOf:
+        - $ref: "#/components/schemas/ImportBasicNote"
+        - $ref: "#/components/schemas/ImportReversedNote"
+        - $ref: "#/components/schemas/ImportClozeNote"
+        - $ref: "#/components/schemas/ImportMultipleChoiceNote"
+        - $ref: "#/components/schemas/ImportFreeTextNote"
+
+    ImportCommon:
+      type: object
+      properties:
+        tags:
+          type: array
+          items:
+            type: string
+        source:
+          type: object
+          additionalProperties: false
+          properties:
+            type:
+              type: string
+            reference:
+              type: string
+
+    ImportBasicNote:
+      allOf:
+        - $ref: "#/components/schemas/ImportCommon"
+        - type: object
+          additionalProperties: false
+          required: [noteType, front, back]
+          properties:
+            noteType:
+              const: basic
+            front:
+              type: string
+            back:
+              type: string
+
+    ImportReversedNote:
+      allOf:
+        - $ref: "#/components/schemas/ImportCommon"
+        - type: object
+          additionalProperties: false
+          required: [noteType, front, back]
+          properties:
+            noteType:
+              const: reversed
+            front:
+              type: string
+            back:
+              type: string
+
+    ImportClozeNote:
+      allOf:
+        - $ref: "#/components/schemas/ImportCommon"
+        - type: object
+          additionalProperties: false
+          required: [noteType, text]
+          properties:
+            noteType:
+              const: cloze
+            text:
+              type: string
+              pattern: ".*\\{\\{c[0-9]+::.+\\}\\}.*"
+
+    ImportMultipleChoiceNote:
+      allOf:
+        - $ref: "#/components/schemas/ImportCommon"
+        - type: object
+          additionalProperties: false
+          required: [noteType, question, options, correctOptionKeys]
+          properties:
+            noteType:
+              const: multiple-choice
+            question:
+              type: string
+            options:
+              type: array
+              minItems: 4
+              maxItems: 5
+              description: Multiple Choice P0 permite exactamente variantes ABCD o ABCDE.
+              items:
+                $ref: "#/components/schemas/MultipleChoiceOption"
+            correctOptionKeys:
+              type: array
+              minItems: 1
+              maxItems: 1
+              uniqueItems: true
+              description: Debe contener exactamente una opción correcta.
+              items:
+                type: string
+                pattern: "^[A-Z]$"
+            explanation:
+              type: string
+
+    ImportFreeTextNote:
+      allOf:
+        - $ref: "#/components/schemas/ImportCommon"
+        - type: object
+          additionalProperties: false
+          required: [noteType, prompt, expectedAnswer]
+          properties:
+            noteType:
+              const: free-text
+            prompt:
+              type: string
+            expectedAnswer:
+              type: string
+            gradingGuidance:
+              type: string
+
+    ImportValidationResponse:
+      type: object
+      required: [valid, errors, warnings]
+      properties:
+        valid:
+          type: boolean
+        errors:
+          type: array
+          items:
+            $ref: "#/components/schemas/Violation"
+        warnings:
+          type: array
+          items:
+            type: string
+
+    ImportPreview:
+      type: object
+      required: [valid, summary]
+      properties:
+        valid:
+          type: boolean
+        summary:
+          type: object
+          required: [deckTitle, totalNotes, predictedCards]
+          properties:
+            deckTitle:
+              type: string
+            totalNotes:
+              type: integer
+            predictedCards:
+              type: integer
+            duplicateCandidates:
+              type: integer
+        normalizedPayload:
+          $ref: "#/components/schemas/FlashcardImportV1"
+        warnings:
+          type: array
+          items:
+            type: string
+
+    ImportResult:
+      type: object
+      required: [importId, deckId, importedNotes, importedCards]
+      properties:
+        importId:
+          type: string
+          format: uuid
+        deckId:
+          type: string
+          format: uuid
+        importedNotes:
+          type: integer
+        importedCards:
+          type: integer
+        warnings:
+          type: array
+          items:
+            type: string
+
+    McpToolDescriptor:
+      type: object
+      required: [name, title, inputSchema]
+      properties:
+        name:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        inputSchema:
+          type: object
+          additionalProperties: true
+
+    McpInvokeRequest:
+      type: object
+      additionalProperties: false
+      required: [arguments]
+      properties:
+        arguments:
+          type: object
+          additionalProperties: true
+
+    McpInvokeResponse:
+      type: object
+      required: [toolName, success]
+      properties:
+        toolName:
+          type: string
+        success:
+          type: boolean
+        content:
+          type: object
+          additionalProperties: true
+        error:
+          type: string
+
+    McpResourceDescriptor:
+      type: object
+      required: [uri, name]
+      properties:
+        uri:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        mimeType:
+          type: string
+
+    McpPromptDescriptor:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+        description:
+          type: string
+        arguments:
+          type: array
+          items:
+            type: string
+
+    McpHttpEnvelope:
+      type: object
+      additionalProperties: true
+      description: Envelope genérico para transporte MCP sobre HTTP.
+
+    SkillDocument:
+      type: object
+      required: [name, version, content]
+      properties:
+        name:
+          type: string
+        version:
+          type: string
+        contentType:
+          type: string
+          default: text/markdown
+        content:
+          type: string
+
+    CliCommandCatalog:
+      type: object
+      required: [commands]
+      properties:
+        commands:
+          type: array
+          items:
+            type: object
+            required: [name, description]
+            properties:
+              name:
+                type: string
+              description:
+                type: string
+              arguments:
+                type: array
+                items:
+                  type: string
+              examples:
+                type: array
+                items:
+                  type: string
+
+    AuditLog:
+      type: object
+      required: [id, actorId, action, resourceType, resourceId, timestamp]
+      properties:
+        id:
+          type: string
+          format: uuid
+        actorId:
+          type: string
+          format: uuid
+        action:
+          type: string
+        resourceType:
+          type: string
+        resourceId:
+          type: string
+        oldValue:
+          type: object
+          additionalProperties: true
+        newValue:
+          type: object
+          additionalProperties: true
+        requestId:
+          type: string
+        traceId:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+
+    PagedAuditLogs:
+      type: object
+      required: [items, page]
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/AuditLog"
+        page:
+          $ref: "#/components/schemas/PageMeta"
+
+    RateLimitStatus:
+      type: object
+      properties:
+        principal:
+          type: string
+        clientId:
+          type: string
+        limits:
+          type: array
+          items:
+            type: object
+            properties:
+              key:
+                type: string
+              capacity:
+                type: integer
+              remaining:
+                type: integer
+              resetAt:
+                type: string
+                format: date-time
+
+    TraceSummary:
+      type: object
+      required: [traceId, spans]
+      properties:
+        traceId:
+          type: string
+        requestId:
+          type: string
+        durationMs:
+          type: integer
+        spans:
+          type: array
+          items:
+            type: object
+            properties:
+              spanId:
+                type: string
+              name:
+                type: string
+              durationMs:
+                type: integer
+              tags:
+                type: object
+                additionalProperties: true
+
+    HealthResponse:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+        components:
+          type: object
+          additionalProperties: true
+
+    MetricCatalog:
+      type: object
+      properties:
+        names:
+          type: array
+          items:
+            type: string

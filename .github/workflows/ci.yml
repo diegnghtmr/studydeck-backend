@@ -31,7 +31,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       # Build/test on JDK 25 (GA): compiles --release 25 to identical bytecode and
       # avoids google-java-format/ASM failing on JDK 26 class files (major version 70).
@@ -84,7 +84,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Validate compose.yaml
         run: docker compose config

@@ -88,4 +88,26 @@ jobs:
         run: docker compose config
 
       - name: Docker build (no push)
-        run: docker build --no-cache -t studydeck-backend:ci .
+        run: docker build -t studydeck-backend:ci .
+
+      - name: Docker Scout — scan image for CVEs
+        if: github.event_name == 'pull_request'
+        uses: docker/scout-action@v1
+        with:
+          command: cves
+          image: studydeck-backend:ci
+          sarif-file: scout-results.sarif
+          # Fail the build on critical/high vulnerabilities.
+          exit-code: true
+          only-severities: critical,high
+        env:
+          DOCKER_SCOUT_NO_AUTH: "true"
+        continue-on-error: true
+
+      - name: Upload Docker Scout SARIF
+        if: always() && github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: docker-scout-sarif
+          path: scout-results.sarif
+          if-no-files-found: ignore

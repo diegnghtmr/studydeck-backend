@@ -36,7 +36,7 @@ jobs:
       # Build/test on JDK 25 (GA): compiles --release 25 to identical bytecode and
       # avoids google-java-format/ASM failing on JDK 26 class files (major version 70).
       - name: Set up JDK 25 (compiles to --release 25)
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           java-version: "25"
           distribution: "temurin"

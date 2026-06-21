@@ -20,7 +20,8 @@ import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
 /**
- * Unit tests for {@link AiFlashcardService}.
+ * Unit tests for the AI flashcard use cases ({@link GenerateFlashcardsService} and {@link
+ * ImproveFlashcardService}).
  *
  * <p>TDD contract:
  *

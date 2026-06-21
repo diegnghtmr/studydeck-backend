@@ -21,7 +21,7 @@ repositories {
     mavenCentral()
 }
 
-val picocliVersion = "4.7.6"
+val picocliVersion = "4.7.7"
 val jacksonVersion = "2.19.0"
 val junitVersion = "5.11.4"
 val mockitoVersion = "5.14.2"

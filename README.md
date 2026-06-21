@@ -35,6 +35,34 @@ docker compose logs -f backend
 curl http://localhost:8080/actuator/health
 ```
 
+The bundled compose runs the **dev** profile by default (static HS256 JWT decoder + dev-only OpenAPI). A real deployment sets `SPRING_PROFILES_ACTIVE=prod` **and** `SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI` (prod refuses to start without a real issuer).
+
+### Authentication: dev token vs. real IdP
+
+Two local options:
+
+**a) Dev token (fastest)** — no IdP. Mint an HS256 JWT signed with the dev secret and call the API directly. Good for API/feature work:
+
+```bash
+TOKEN=$(node -e 'const c=require("crypto"),S="studydeck-dev-secret-key-32-chars-min-!!";const b=o=>Buffer.from(JSON.stringify(o)).toString("base64url");const n=Math.floor(Date.now()/1e3);const d=b({alg:"HS256",typ:"JWT"})+"."+b({sub:"00000000-0000-0000-0000-000000000001",email:"dev@studydeck.local",scope:"study.read study.write review.write import.write export.read documents.read documents.write rag.query ai.generate mcp.invoke",iat:n,exp:n+86400});process.stdout.write(d+"."+c.createHmac("sha256",S).update(d).digest("base64url"))')
+curl -s -H "Authorization: Bearer $TOKEN" http://localhost:8080/v1/auth/me | jq
+```
+
+**b) Real OIDC login (Keycloak)** — full login flow, mirrors production. Brings up a local Keycloak with a pre-imported `studydeck` realm, SPA client (PKCE) and a seeded `dev`/`dev` user:
+
+```bash
+docker compose -f compose.yaml -f compose.idp.yaml up -d
+# Keycloak admin: http://localhost:8081 (admin/admin) · realm: studydeck · user: dev/dev
+```
+
+This overlay disables the dev HS256 decoder and validates real Keycloak RS256 tokens. Run the frontend with `studydeck-frontend/env.idp.example` to get the browser login. Fetch a token headless for testing:
+
+```bash
+curl -s -X POST http://localhost:8081/realms/studydeck/protocol/openid-connect/token \
+  -d client_id=studydeck-spa -d grant_type=password -d username=dev -d password=dev -d scope=openid \
+  | jq -r .access_token
+```
+
 ### Run with Gradle (dev profile, requires local PostgreSQL)
 
 ```bash
@@ -52,7 +80,8 @@ SPRING_PROFILES_ACTIVE=dev ./gradlew bootRun
 | `DB_URL` | `jdbc:postgresql://localhost:5432/studydeck` | JDBC URL |
 | `DB_USER` | `studydeck` | Database user |
 | `DB_PASS` | `studydeck` | Database password |
-| `SPRING_PROFILES_ACTIVE` | `prod` | Active profile (`dev` or `prod`) |
+| `SPRING_PROFILES_ACTIVE` | `dev` (compose) | Active profile (`dev` or `prod`) |
+| `SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI` | _(empty)_ | Required in `prod`; set to your OIDC issuer |
 | `BACKEND_PORT` | `8080` | Host port mapping |
 | `POSTGRES_PORT` | `5432` | Host PostgreSQL port mapping |
 

@@ -1,0 +1,69 @@
+# StudyDeck — IdP overlay (real local OIDC login via Keycloak).
+#
+# Brings up Keycloak alongside the core stack and points the backend at it, so a
+# browser can log in for real (no dev token). Mirrors the dev experience of a
+# production deployment, end to end.
+#
+# Usage:
+#   docker compose -f compose.yaml -f compose.idp.yaml up -d
+#
+#   Keycloak admin : http://localhost:8081  (admin / admin)
+#   Realm          : studydeck   |   SPA client: studydeck-spa
+#   Seeded user    : dev / dev
+#
+# Then run the frontend with the OIDC env (see studydeck-frontend/.env.idp.example):
+#   cp .env.idp.example .env.local && pnpm dev   →  http://localhost:5173 → real login
+#
+# The default `docker compose up` (without this file) keeps the lightweight
+# dev-token flow; this overlay disables the dev HS256 decoder and validates real
+# Keycloak RS256 tokens instead.
+
+services:
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.4.5
+    container_name: studydeck-keycloak
+    restart: unless-stopped
+    command: start-dev --import-realm --health-enabled=true
+    environment:
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      KC_HEALTH_ENABLED: "true"
+      KC_HOSTNAME_STRICT: "false"
+      KC_HOSTNAME_STRICT_HTTPS: "false"
+      # Pin the public issuer to the host-mapped URL so every token carries
+      # iss=http://localhost:8081/realms/studydeck regardless of how Keycloak is
+      # reached. The backend fetches signing keys over the internal network
+      # (keycloak:8080) via jwk-set-uri, so issuer and JWKS stay consistent.
+      KC_HOSTNAME: ${KC_HOSTNAME:-http://localhost:8081}
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
+    ports:
+      - "${KEYCLOAK_PORT:-8081}:8080"
+      - "${KEYCLOAK_MGMT_PORT:-9001}:9000"
+    volumes:
+      - ./ops/idp/keycloak:/opt/keycloak/data/import:ro
+    healthcheck:
+      # The Keycloak image ships no curl/wget; probe the management health port with bash /dev/tcp.
+      test:
+        [
+          "CMD-SHELL",
+          "exec 3<>/dev/tcp/localhost/9000 && echo -e 'GET /health/ready HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n' >&3 && grep -q '\"status\": \"UP\"' <&3",
+        ]
+      interval: 15s
+      timeout: 10s
+      retries: 12
+      start_period: 90s
+
+  backend:
+    environment:
+      # Validate real Keycloak RS256 tokens instead of the dev HS256 decoder.
+      # issuer-uri is the PUBLIC issuer (matches the token's iss claim) — used only to
+      # validate `iss`. jwk-set-uri points at the INTERNAL address so signing keys are
+      # fetched over the docker network without OIDC discovery (which would hit localhost).
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: http://localhost:8081/realms/studydeck
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_JWK_SET_URI: http://keycloak:8080/realms/studydeck/protocol/openid-connect/certs
+      STUDYDECK_SECURITY_DEV_JWT_ENABLED: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      keycloak:
+        condition: service_healthy

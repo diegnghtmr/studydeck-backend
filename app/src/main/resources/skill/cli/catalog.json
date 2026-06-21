@@ -1,0 +1,74 @@
+{
+  "commands": [
+    {
+      "name": "auth login",
+      "description": "Store an auth token for CLI use",
+      "arguments": ["--token <bearer>"],
+      "examples": ["studydeck auth login --token $STUDYDECK_TOKEN"]
+    },
+    {
+      "name": "auth whoami",
+      "description": "Show the currently authenticated principal (GET /v1/auth/me)",
+      "arguments": ["--json"],
+      "examples": ["studydeck auth whoami", "studydeck auth whoami --json"]
+    },
+    {
+      "name": "auth logout",
+      "description": "Remove stored auth token",
+      "arguments": [],
+      "examples": ["studydeck auth logout"]
+    },
+    {
+      "name": "deck create",
+      "description": "Create a new deck (POST /v1/decks)",
+      "arguments": ["--title <title>", "--description <text>", "--tag <tag>...", "--json"],
+      "examples": ["studydeck deck create --title \"Biology\" --tag science"]
+    },
+    {
+      "name": "deck ls",
+      "description": "List decks (GET /v1/decks)",
+      "arguments": ["--page <n>", "--size <n>", "--json"],
+      "examples": ["studydeck deck ls", "studydeck deck ls --page 0 --size 20 --json"]
+    },
+    {
+      "name": "note create",
+      "description": "Create a note (POST /v1/notes)",
+      "arguments": [
+        "--deck <uuid>",
+        "--type <basic|reversed|cloze|multiple-choice|free-text>",
+        "--front <text>",
+        "--back <text>",
+        "--text <cloze>",
+        "--tag <tag>...",
+        "--json"
+      ],
+      "examples": [
+        "studydeck note create --deck <uuid> --type basic --front \"Q?\" --back \"A.\""
+      ]
+    },
+    {
+      "name": "study next",
+      "description": "Get next due card for a deck (GET /v1/cards/due)",
+      "arguments": ["--deck <uuid>", "--json"],
+      "examples": ["studydeck study next --deck <uuid>"]
+    },
+    {
+      "name": "study review submit",
+      "description": "Submit a card review rating (POST /v1/reviews)",
+      "arguments": ["--card <uuid>", "--rating <again|hard|good|easy>", "--json"],
+      "examples": ["studydeck study review submit --card <uuid> --rating good"]
+    },
+    {
+      "name": "import json",
+      "description": "Import flashcards from a JSON file (POST /v1/imports/flashcards)",
+      "arguments": ["--file <path>", "--deck <uuid>", "--json"],
+      "examples": ["studydeck import json --file deck.json"]
+    },
+    {
+      "name": "export deck",
+      "description": "Export a deck to JSON (GET /v1/exports/decks/{id}.json)",
+      "arguments": ["<deckId>", "--out <path>"],
+      "examples": ["studydeck export deck <uuid> --out deck.json"]
+    }
+  ]
+}

@@ -65,6 +65,8 @@ dependencies {
 
     // --- Observability ---
     implementation("org.springframework.boot:spring-boot-starter-actuator")
+    // Prometheus scrape endpoint at /actuator/prometheus (enabled via management exposure).
+    runtimeOnly("io.micrometer:micrometer-registry-prometheus")
 
     // --- JSON Schema validation (Draft 2020-12 via networknt) ---
     implementation("com.networknt:json-schema-validator:${jsonSchemaValidatorVersion}")

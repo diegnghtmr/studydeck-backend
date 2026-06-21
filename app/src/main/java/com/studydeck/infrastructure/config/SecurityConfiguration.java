@@ -53,8 +53,10 @@ public class SecurityConfiguration {
         .authorizeHttpRequests(
             auth ->
                 auth
-                    // Actuator probes — open for load balancers
-                    .requestMatchers("/actuator/health", "/actuator/info")
+                    // Actuator probes + Prometheus scrape — open for load balancers and the
+                    // metrics collector. The metrics endpoint exposes no PII; in production keep
+                    // the actuator port reachable only from the internal monitoring network.
+                    .requestMatchers("/actuator/health", "/actuator/info", "/actuator/prometheus")
                     .permitAll()
                     // Dev OpenAPI endpoint (only active in dev profile)
                     .requestMatchers("/v3/api-docs.yaml")

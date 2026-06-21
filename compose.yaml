@@ -14,6 +14,10 @@ name: studydeck
 volumes:
   postgres_data:
     driver: local
+  prometheus_data:
+    driver: local
+  grafana_data:
+    driver: local
 
 services:
   postgres:
@@ -86,6 +90,59 @@ services:
     depends_on:
       backend:
         condition: service_healthy
+
+  # obs profile — observability stack: Prometheus scrapes the backend's
+  # /actuator/prometheus endpoint; Grafana visualizes it with a provisioned
+  # datasource + dashboard; the OTEL collector accepts OTLP for future tracing.
+  #
+  # Usage: docker compose --profile obs up -d
+  #   Prometheus → http://localhost:9091   Grafana → http://localhost:3001 (admin/admin)
+  prometheus:
+    profiles: [obs]
+    image: prom/prometheus:v3.1.0
+    container_name: studydeck-prometheus
+    restart: unless-stopped
+    volumes:
+      - ./observability/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    command:
+      - "--config.file=/etc/prometheus/prometheus.yml"
+      - "--storage.tsdb.path=/prometheus"
+    ports:
+      - "${PROMETHEUS_PORT:-9091}:9090"
+    depends_on:
+      backend:
+        condition: service_healthy
+
+  grafana:
+    profiles: [obs]
+    image: grafana/grafana:11.5.1
+    container_name: studydeck-grafana
+    restart: unless-stopped
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-admin}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+    volumes:
+      - ./observability/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./observability/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - grafana_data:/var/lib/grafana
+    ports:
+      - "${GRAFANA_PORT:-3001}:3000"
+    depends_on:
+      - prometheus
+
+  otel-collector:
+    profiles: [obs]
+    image: otel/opentelemetry-collector-contrib:0.119.0
+    container_name: studydeck-otel-collector
+    restart: unless-stopped
+    command: ["--config=/etc/otel/config.yaml"]
+    volumes:
+      - ./observability/otel-collector/config.yaml:/etc/otel/config.yaml:ro
+    ports:
+      - "${OTEL_GRPC_PORT:-4317}:4317"
+      - "${OTEL_HTTP_PORT:-4318}:4318"
 
   # cli profile — studydeck CLI image; attach to backend network so it can reach
   # the backend service by hostname. Pass STUDYDECK_TOKEN from the host env.

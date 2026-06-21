@@ -116,13 +116,21 @@ management:
   endpoints:
     web:
       exposure:
-        include: health,info
+        # Safe-by-default set, also used by the prod profile: probes + Prometheus scrape only.
+        include: health,info,prometheus
   endpoint:
     health:
       show-details: always
   info:
     env:
       enabled: true
+  prometheus:
+    metrics:
+      export:
+        enabled: true
+  metrics:
+    tags:
+      application: ${spring.application.name}
 
 info:
   app:

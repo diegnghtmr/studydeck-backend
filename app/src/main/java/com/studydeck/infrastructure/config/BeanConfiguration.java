@@ -3,6 +3,8 @@ package com.studydeck.infrastructure.config;
 import com.studydeck.application.service.AuthService;
 import com.studydeck.application.service.CardService;
 import com.studydeck.application.service.DeckService;
+import com.studydeck.application.service.DeleteAccountService;
+import com.studydeck.application.service.ExportAccountService;
 import com.studydeck.application.service.ImportExportService;
 import com.studydeck.application.service.NoteService;
 import com.studydeck.application.service.NoteTypeService;
@@ -11,10 +13,12 @@ import com.studydeck.application.service.ReviewService;
 import com.studydeck.domain.port.in.ArchiveDeckUseCase;
 import com.studydeck.domain.port.in.CreateDeckUseCase;
 import com.studydeck.domain.port.in.CreateNoteUseCase;
+import com.studydeck.domain.port.in.DeleteAccountUseCase;
 import com.studydeck.domain.port.in.DeleteCardUseCase;
 import com.studydeck.domain.port.in.DeleteDeckUseCase;
 import com.studydeck.domain.port.in.DeleteNoteUseCase;
 import com.studydeck.domain.port.in.ExecuteImportUseCase;
+import com.studydeck.domain.port.in.ExportAccountUseCase;
 import com.studydeck.domain.port.in.ExportDeckUseCase;
 import com.studydeck.domain.port.in.GetCardQuery;
 import com.studydeck.domain.port.in.GetCurrentPrincipalQuery;
@@ -26,6 +30,7 @@ import com.studydeck.domain.port.in.GetReviewSessionQuery;
 import com.studydeck.domain.port.in.ListCardsForNoteQuery;
 import com.studydeck.domain.port.in.ListCardsQuery;
 import com.studydeck.domain.port.in.ListDecksQuery;
+import com.studydeck.domain.port.in.ListDocumentsQuery;
 import com.studydeck.domain.port.in.ListDueCardsQuery;
 import com.studydeck.domain.port.in.ListNoteTypesQuery;
 import com.studydeck.domain.port.in.ListNotesQuery;
@@ -631,5 +636,28 @@ public class BeanConfiguration {
         cardGenerator,
         importJobRepository,
         noteHashRepository);
+  }
+
+  // ---------------------------------------------------------------
+  // GDPR account use cases
+  // ---------------------------------------------------------------
+
+  @Bean
+  ExportAccountUseCase exportAccountUseCase(
+      UserAccountRepository userAccountRepository,
+      @org.springframework.beans.factory.annotation.Qualifier("listDecksQuery")
+          ListDecksQuery listDecksQuery,
+      @org.springframework.beans.factory.annotation.Qualifier("exportDeckUseCase")
+          ExportDeckUseCase exportDeckUseCase,
+      @org.springframework.beans.factory.annotation.Qualifier("listDocumentsQuery")
+          ListDocumentsQuery listDocumentsQuery) {
+    return new ExportAccountService(
+        userAccountRepository, listDecksQuery, exportDeckUseCase, listDocumentsQuery);
+  }
+
+  @Bean
+  DeleteAccountUseCase deleteAccountUseCase(
+      UserAccountRepository userAccountRepository, AuditEventPort auditEventPort) {
+    return new DeleteAccountService(userAccountRepository, auditEventPort);
   }
 }

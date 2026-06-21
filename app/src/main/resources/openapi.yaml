@@ -22,6 +22,7 @@ servers:
     description: Producción
 tags:
   - name: Auth
+  - name: Account
   - name: Users
   - name: Decks
   - name: NoteTypes
@@ -41,6 +42,40 @@ security:
       - study.read
 
 paths:
+  /v1/account/export:
+    get:
+      tags: [Account]
+      summary: Export caller's own data (GDPR data portability)
+      operationId: exportAccount
+      security:
+        - oauth2: [export.read]
+      responses:
+        "200":
+          description: Full account data export
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AccountExport"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
+  /v1/account:
+    delete:
+      tags: [Account]
+      summary: Permanently delete caller's account and all associated data (GDPR right to erasure)
+      operationId: deleteAccount
+      security:
+        - oauth2: [study.write]
+      responses:
+        "204":
+          description: Account and all data permanently deleted
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+
   /v1/auth/me:
     get:
       tags: [Auth]
@@ -1651,6 +1686,54 @@ components:
             $ref: "#/components/schemas/Problem"
 
   schemas:
+    AccountExport:
+      type: object
+      required: [account, exportedAt]
+      properties:
+        account:
+          type: object
+          required: [id, createdAt]
+          properties:
+            id:
+              type: string
+              format: uuid
+            subject:
+              type: string
+            email:
+              type: string
+              format: email
+            displayName:
+              type: string
+            createdAt:
+              type: string
+              format: date-time
+        decks:
+          type: array
+          description: Per-deck flashcard export payloads (same shape as FlashcardImportV1)
+          items:
+            $ref: "#/components/schemas/FlashcardImportV1"
+        documents:
+          type: array
+          items:
+            type: object
+            required: [id, title, sourceType, ingestStatus, createdAt]
+            properties:
+              id:
+                type: string
+                format: uuid
+              title:
+                type: string
+              sourceType:
+                type: string
+              ingestStatus:
+                type: string
+              createdAt:
+                type: string
+                format: date-time
+        exportedAt:
+          type: string
+          format: date-time
+
     Problem:
       type: object
       additionalProperties: true

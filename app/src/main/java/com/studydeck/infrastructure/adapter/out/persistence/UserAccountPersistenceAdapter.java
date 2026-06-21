@@ -39,4 +39,10 @@ class UserAccountPersistenceAdapter implements UserAccountRepository {
   public boolean existsById(OwnerId id) {
     return jpaRepo.existsById(id.value());
   }
+
+  @Override
+  public void deleteById(OwnerId id) {
+    // Idempotent: deleteById on Spring Data JPA is a no-op when the entity does not exist.
+    jpaRepo.deleteById(id.value());
+  }
 }

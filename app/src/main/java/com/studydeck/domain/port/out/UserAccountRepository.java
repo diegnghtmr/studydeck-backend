@@ -37,4 +37,15 @@ public interface UserAccountRepository {
    * @return {@code true} if a row exists
    */
   boolean existsById(OwnerId id);
+
+  /**
+   * Deletes a user account by id.
+   *
+   * <p>Idempotent: deleting a non-existent id is a no-op (does not throw). The database-level
+   * {@code ON DELETE CASCADE} constraints ensure that all child rows (decks, notes, cards,
+   * scheduling state, documents, embeddings, import jobs, audit events) are removed automatically.
+   *
+   * @param id non-null
+   */
+  void deleteById(OwnerId id);
 }

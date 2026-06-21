@@ -31,6 +31,11 @@ public class InMemoryUserAccountRepository implements UserAccountRepository {
     return store.containsKey(id);
   }
 
+  @Override
+  public void deleteById(OwnerId id) {
+    store.remove(id);
+  }
+
   /** Test helper: number of stored accounts. */
   public int size() {
     return store.size();

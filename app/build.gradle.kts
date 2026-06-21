@@ -27,7 +27,7 @@ repositories {
 val archunitVersion = "1.4.1"
 val testcontainersVersion = "1.21.0"
 val jacocoVersion = "0.8.15"
-val jsonSchemaValidatorVersion = "1.5.4"
+val jsonSchemaValidatorVersion = "3.0.4"
 val springAiVersion = "2.0.0"
 
 dependencyManagement {

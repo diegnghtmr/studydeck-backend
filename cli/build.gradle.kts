@@ -25,7 +25,7 @@ val picocliVersion = "4.7.6"
 val jacksonVersion = "2.19.0"
 val junitVersion = "5.11.4"
 val mockitoVersion = "5.14.2"
-val assertjVersion = "3.27.3"
+val assertjVersion = "3.27.7"
 
 dependencies {
     // --- CLI framework ---

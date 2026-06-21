@@ -23,8 +23,8 @@ repositories {
 
 val picocliVersion = "4.7.7"
 val jacksonVersion = "2.22.0"
-val junitVersion = "5.11.4"
-val mockitoVersion = "5.14.2"
+val junitVersion = "6.1.0"
+val mockitoVersion = "5.23.0"
 val assertjVersion = "3.27.7"
 
 dependencies {

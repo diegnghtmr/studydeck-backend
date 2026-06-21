@@ -24,8 +24,8 @@ repositories {
 }
 
 // Version catalogue — kept explicit for traceability (TRD matrix)
-val archunitVersion = "1.4.1"
-val testcontainersVersion = "1.21.0"
+val archunitVersion = "1.4.2"
+val testcontainersVersion = "2.0.5"
 val jacocoVersion = "0.8.15"
 val jsonSchemaValidatorVersion = "1.5.4"
 val springAiVersion = "2.0.0"

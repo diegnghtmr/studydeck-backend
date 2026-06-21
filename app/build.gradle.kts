@@ -113,10 +113,21 @@ tasks.jacocoTestReport {
 
 tasks.jacocoTestCoverageVerification {
     violationRules {
+        // P7 hardening: real coverage gates. Current actuals are ~67% instruction / ~54% branch;
+        // gates are set below those with headroom so normal fluctuation does not break CI while
+        // still preventing meaningful regressions.
         rule {
             limit {
-                // Baseline threshold for P0 — grows per phase
-                minimum = "0.10".toBigDecimal()
+                counter = "INSTRUCTION"
+                value = "COVEREDRATIO"
+                minimum = "0.60".toBigDecimal()
+            }
+        }
+        rule {
+            limit {
+                counter = "BRANCH"
+                value = "COVEREDRATIO"
+                minimum = "0.45".toBigDecimal()
             }
         }
     }

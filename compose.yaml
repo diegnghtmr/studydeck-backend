@@ -48,8 +48,12 @@ services:
       DB_URL: jdbc:postgresql://postgres:5432/studydeck
       DB_USER: ${DB_USER:-studydeck}
       DB_PASS: ${DB_PASS:-studydeck}
-      # Default to prod profile; override to dev for local exploration
-      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-prod}
+      # Local/demo stack defaults to the dev profile: a static HS256 JWT decoder (no real IdP
+      # required) and dev-only OpenAPI exposure. For a real deployment set
+      # SPRING_PROFILES_ACTIVE=prod AND SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI — the
+      # prod profile disables the dev decoder and refuses to start without a real issuer (fail-fast).
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-dev}
+      SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI: ${SPRING_SECURITY_OAUTH2_RESOURCESERVER_JWT_ISSUER_URI:-}
       JAVA_TOOL_OPTIONS: "-Djava.security.egd=file:/dev/./urandom"
     ports:
       - "${BACKEND_PORT:-8080}:8080"

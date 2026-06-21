@@ -5,6 +5,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
@@ -15,9 +16,12 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
  * <p>This allows {@code docker compose up} to work end-to-end without a real IdP (Keycloak). A
  * static bearer token signed with the dev secret can be generated using the provided utility.
  *
- * <p>NEVER use this in production. The {@code @ConditionalOnMissingBean(JwtDecoder.class)}
- * annotation ensures this bean is NOT loaded when a real JwtDecoder is already configured (e.g.,
- * via {@code spring.security.oauth2.resourceserver.jwt.issuer-uri} in production).
+ * <p>NEVER use this in production. {@code @Profile("!prod")} guarantees this configuration is NEVER
+ * loaded under the prod profile, so the dev HS256 decoder can never authenticate production traffic
+ * (see {@link ProdSecurityConfiguration} for the prod fail-fast guard). The
+ * {@code @ConditionalOnMissingBean(JwtDecoder.class)} annotation additionally yields to a real
+ * JwtDecoder when one is configured in non-prod profiles (e.g., via {@code
+ * spring.security.oauth2.resourceserver.jwt.issuer-uri}).
  *
  * <p>Dev token generation example (jwtcli or any JWT library):
  *
@@ -37,6 +41,7 @@ import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
  * default value is provided ONLY for local development convenience — override in your .env.
  */
 @Configuration
+@Profile("!prod")
 @ConditionalOnMissingBean(JwtDecoder.class)
 public class DevSecurityConfiguration {
 

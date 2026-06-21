@@ -125,6 +125,12 @@ tasks.test {
     finalizedBy(tasks.jacocoTestReport)
     // Allow Testcontainers to reach Docker socket
     jvmArgs("-Djava.security.egd=file:/dev/./urandom")
+    // Each @SpringBootTest caches a full Spring context (JPA + Spring AI + Flyway). With ~16
+    // Testcontainers-backed test classes these accumulate in the context cache and can exhaust the
+    // default heap (OutOfMemoryError during context init). Give the test JVM headroom and bound the
+    // Spring context cache so memory stays predictable as more integration tests are added.
+    maxHeapSize = "3g"
+    systemProperty("spring.test.context.cache.maxSize", "12")
 }
 
 tasks.named("check") {

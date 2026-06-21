@@ -33,10 +33,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up JDK 26 (compiles to --release 25)
+      # Build/test on JDK 25 (GA): compiles --release 25 to identical bytecode and
+      # avoids google-java-format/ASM failing on JDK 26 class files (major version 70).
+      - name: Set up JDK 25 (compiles to --release 25)
         uses: actions/setup-java@v4
         with:
-          java-version: "26"
+          java-version: "25"
           distribution: "temurin"
           cache: gradle
 

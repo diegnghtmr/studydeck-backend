@@ -345,6 +345,33 @@ paths:
               schema:
                 $ref: "#/components/schemas/DeckStats"
 
+  /v1/stats:
+    get:
+      tags: [Reviews]
+      summary: Get user-scoped cross-deck statistics (dashboard)
+      operationId: getUserStats
+      security:
+        - oauth2: [study.read]
+      parameters:
+        - in: query
+          name: tz
+          required: false
+          schema:
+            type: string
+            example: America/Argentina/Buenos_Aires
+          description: >
+            IANA timezone id used to compute today's boundary and day streak.
+            Defaults to UTC when absent or unrecognized.
+      responses:
+        "200":
+          description: User statistics across all decks
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UserStats"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+
   /v1/notes:
     get:
       tags: [Notes]
@@ -2026,6 +2053,39 @@ components:
           type: number
         averageRetention30d:
           type: number
+
+    UserStats:
+      type: object
+      required: [dueToday, newCards, reviewedToday, dayStreak]
+      properties:
+        dueToday:
+          type: integer
+          format: int64
+          description: Number of cards with due_at <= now across all decks.
+        newCards:
+          type: integer
+          format: int64
+          description: >
+            Number of cards in NEW state or with no schedule row at all
+            (never reviewed) across all decks.
+        reviewedToday:
+          type: integer
+          format: int64
+          description: >
+            Number of review_log entries for the user where reviewed_at falls
+            within today in the requested timezone.
+        dayStreak:
+          type: integer
+          description: >
+            Consecutive days (in the requested timezone) counting back from today
+            on which the user performed at least one review. If today has no
+            review yet, streak is 0.
+        retention30d:
+          type: number
+          nullable: true
+          description: >
+            Average retention (non-AGAIN fraction) over the last 30 days across
+            all decks. Null when there are zero reviews in the window.
 
     PagedDecks:
       type: object

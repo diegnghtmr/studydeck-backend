@@ -29,7 +29,9 @@ public interface CreateDeckUseCase {
       String title,
       String description,
       List<String> tags,
-      double defaultDesiredRetention) {
+      double defaultDesiredRetention,
+      String icon,
+      String color) {
 
     public Command {
       if (ownerId == null) {
@@ -50,9 +52,19 @@ public interface CreateDeckUseCase {
       }
     }
 
-    /** Convenience constructor using default retention (0.9) and no tags. */
+    /** Convenience constructor using default retention (0.9), no tags, no custom appearance. */
     public Command(OwnerId ownerId, String title, String description) {
-      this(ownerId, title, description, null, 0.9);
+      this(ownerId, title, description, null, 0.9, null, null);
+    }
+
+    /** Convenience constructor without custom appearance (icon/color default to id-derived). */
+    public Command(
+        OwnerId ownerId,
+        String title,
+        String description,
+        List<String> tags,
+        double defaultDesiredRetention) {
+      this(ownerId, title, description, tags, defaultDesiredRetention, null, null);
     }
   }
 }

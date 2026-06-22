@@ -91,6 +91,39 @@ public final class InMemoryReviewLogRepository implements ReviewLogRepository {
     return (double) nonAgain / relevant.size();
   }
 
+  @Override
+  public long countReviewedTodayGlobal(OwnerId ownerId, Instant dayStart, Instant dayEnd) {
+    return entries.stream()
+        .filter(e -> e.ownerId().equals(ownerId))
+        .filter(e -> !e.log().reviewedAt().isBefore(dayStart))
+        .filter(e -> e.log().reviewedAt().isBefore(dayEnd))
+        .count();
+  }
+
+  @Override
+  public java.util.List<java.time.LocalDate> distinctReviewDays(
+      OwnerId ownerId, java.time.ZoneId zone) {
+    return entries.stream()
+        .filter(e -> e.ownerId().equals(ownerId))
+        .map(e -> e.log().reviewedAt().atZone(zone).toLocalDate())
+        .distinct()
+        .sorted(java.util.Comparator.reverseOrder())
+        .toList();
+  }
+
+  @Override
+  public Double averageRetentionGlobal(OwnerId ownerId, Instant since) {
+    List<ReviewLog> relevant =
+        entries.stream()
+            .filter(e -> e.ownerId().equals(ownerId))
+            .filter(e -> !e.log().reviewedAt().isBefore(since))
+            .map(StoredEntry::log)
+            .toList();
+    if (relevant.isEmpty()) return null;
+    long nonAgain = relevant.stream().filter(l -> l.rating() != ReviewRating.AGAIN).count();
+    return (double) nonAgain / relevant.size();
+  }
+
   // Test helpers
 
   public List<ReviewLog> all() {

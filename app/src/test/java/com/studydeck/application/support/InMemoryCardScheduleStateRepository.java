@@ -39,6 +39,30 @@ public final class InMemoryCardScheduleStateRepository implements CardScheduleSt
         .toList();
   }
 
+  @Override
+  public long countDueGlobal(OwnerId ownerId, Instant now) {
+    return store.entrySet().stream()
+        .filter(e -> e.getValue().ownerId().equals(ownerId))
+        .filter(e -> !e.getValue().state().dueAt().isAfter(now))
+        .count();
+  }
+
+  @Override
+  public long countNewGlobal(OwnerId ownerId) {
+    return store.entrySet().stream()
+        .filter(e -> e.getValue().ownerId().equals(ownerId))
+        .filter(e -> e.getValue().state().state() == com.studydeck.domain.model.CardState.NEW)
+        .count();
+  }
+
+  @Override
+  public long countNewByDeck(OwnerId ownerId, DeckId deckId) {
+    // The double does not track per-card deck association (see findDueCardIds), so this mirrors
+    // countNewGlobal scoped to the owner. Deck-accurate counting is covered by the JPA adapter
+    // test.
+    return countNewGlobal(ownerId);
+  }
+
   // Test helpers
 
   public int size() {

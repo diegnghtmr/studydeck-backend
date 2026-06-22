@@ -4,9 +4,12 @@ import com.studydeck.domain.model.OwnerId;
 import com.studydeck.domain.model.SourceDocument;
 import com.studydeck.domain.port.in.DeleteAccountUseCase;
 import com.studydeck.domain.port.in.ExportAccountUseCase;
+import com.studydeck.domain.port.in.UpdateUserPreferencesUseCase;
 import com.studydeck.domain.port.in.ValidateImportUseCase.ImportPayload;
 import com.studydeck.infrastructure.adapter.in.web.dto.AccountExportResponse;
+import com.studydeck.infrastructure.adapter.in.web.dto.UserPreferencesPatchRequest;
 import com.studydeck.infrastructure.adapter.in.web.mapper.ImportExportMapper;
+import jakarta.validation.Valid;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -17,6 +20,8 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
+import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import tools.jackson.databind.ObjectMapper;
@@ -37,16 +42,19 @@ class AccountController {
 
   private final ExportAccountUseCase exportAccount;
   private final DeleteAccountUseCase deleteAccount;
+  private final UpdateUserPreferencesUseCase updateUserPreferences;
   private final ImportExportMapper importExportMapper;
   private final ObjectMapper objectMapper;
 
   AccountController(
       @Qualifier("exportAccountUseCase") ExportAccountUseCase exportAccount,
       @Qualifier("deleteAccountUseCase") DeleteAccountUseCase deleteAccount,
+      @Qualifier("updateUserPreferencesUseCase") UpdateUserPreferencesUseCase updateUserPreferences,
       ImportExportMapper importExportMapper,
       ObjectMapper objectMapper) {
     this.exportAccount = exportAccount;
     this.deleteAccount = deleteAccount;
+    this.updateUserPreferences = updateUserPreferences;
     this.importExportMapper = importExportMapper;
     this.objectMapper = objectMapper;
   }
@@ -89,6 +97,20 @@ class AccountController {
   ResponseEntity<Void> deleteAccount(@AuthenticationPrincipal Jwt jwt) {
     OwnerId ownerId = ownerIdFrom(jwt);
     deleteAccount.execute(ownerId);
+    return ResponseEntity.noContent().build();
+  }
+
+  // ---------------------------------------------------------------
+  // PATCH /v1/account/preferences
+  // ---------------------------------------------------------------
+
+  @PatchMapping("/preferences")
+  @PreAuthorize("hasAuthority('SCOPE_study.write')")
+  ResponseEntity<Void> updatePreferences(
+      @Valid @RequestBody UserPreferencesPatchRequest request, @AuthenticationPrincipal Jwt jwt) {
+    OwnerId ownerId = ownerIdFrom(jwt);
+    updateUserPreferences.execute(
+        new UpdateUserPreferencesUseCase.Command(ownerId, request.dailyGoal()));
     return ResponseEntity.noContent().build();
   }
 

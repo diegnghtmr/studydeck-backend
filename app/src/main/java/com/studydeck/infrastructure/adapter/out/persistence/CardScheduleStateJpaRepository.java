@@ -28,4 +28,45 @@ interface CardScheduleStateJpaRepository extends JpaRepository<CardScheduleState
       @Param("deckId") UUID deckId,
       @Param("dueAt") Instant dueAt,
       @Param("limit") int limit);
+
+  /** Counts cards with due_at <= now for this owner across ALL decks. */
+  @Query(
+      value =
+          "SELECT COUNT(*) FROM card_schedule_state "
+              + "WHERE owner_id = :ownerId AND due_at <= :now",
+      nativeQuery = true)
+  long countDueGlobal(@Param("ownerId") UUID ownerId, @Param("now") Instant now);
+
+  /**
+   * Counts cards belonging to this owner that are either: (a) in NEW state in card_schedule_state,
+   * or (b) owned cards with NO schedule row at all.
+   */
+  @Query(
+      value =
+          "SELECT COUNT(*) FROM card c "
+              + "JOIN note n ON n.id = c.note_id "
+              + "JOIN deck d ON d.id = n.deck_id "
+              + "LEFT JOIN card_schedule_state css ON css.card_id = c.id "
+              + "WHERE d.owner_id = :ownerId "
+              + "AND c.suspended = FALSE "
+              + "AND (css.card_id IS NULL OR css.state = 'NEW')",
+      nativeQuery = true)
+  long countNewGlobal(@Param("ownerId") UUID ownerId);
+
+  /**
+   * Counts NEW (or unscheduled) cards for this owner within a single deck. Same semantics as {@link
+   * #countNewGlobal(UUID)} scoped to one deck.
+   */
+  @Query(
+      value =
+          "SELECT COUNT(*) FROM card c "
+              + "JOIN note n ON n.id = c.note_id "
+              + "JOIN deck d ON d.id = n.deck_id "
+              + "LEFT JOIN card_schedule_state css ON css.card_id = c.id "
+              + "WHERE d.owner_id = :ownerId "
+              + "AND d.id = :deckId "
+              + "AND c.suspended = FALSE "
+              + "AND (css.card_id IS NULL OR css.state = 'NEW')",
+      nativeQuery = true)
+  long countNewByDeck(@Param("ownerId") UUID ownerId, @Param("deckId") UUID deckId);
 }

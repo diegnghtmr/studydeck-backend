@@ -25,11 +25,15 @@ import java.util.Objects;
 public final class UserAccount {
 
   private static final int MAX_EMAIL_LENGTH = 254;
+  private static final int DEFAULT_DAILY_GOAL = 40;
+  private static final int MIN_DAILY_GOAL = 1;
+  private static final int MAX_DAILY_GOAL = 1000;
 
   private final OwnerId id;
   private String email;
   private String displayName;
   private UserAccountStatus status;
+  private int dailyGoal;
   private final Instant createdAt;
   private Instant updatedAt;
 
@@ -38,12 +42,14 @@ public final class UserAccount {
       String email,
       String displayName,
       UserAccountStatus status,
+      int dailyGoal,
       Instant createdAt,
       Instant updatedAt) {
     this.id = id;
     this.email = email;
     this.displayName = displayName;
     this.status = status;
+    this.dailyGoal = dailyGoal;
     this.createdAt = createdAt;
     this.updatedAt = updatedAt;
   }
@@ -60,7 +66,13 @@ public final class UserAccount {
     validateEmail(email);
     Instant now = Instant.now();
     return new UserAccount(
-        id, email, coerceDisplayName(displayName, email), UserAccountStatus.ACTIVE, now, now);
+        id,
+        email,
+        coerceDisplayName(displayName, email),
+        UserAccountStatus.ACTIVE,
+        DEFAULT_DAILY_GOAL,
+        now,
+        now);
   }
 
   /**
@@ -80,12 +92,25 @@ public final class UserAccount {
       UserAccountStatus status,
       Instant createdAt,
       Instant updatedAt) {
+    return reconstitute(id, email, displayName, status, DEFAULT_DAILY_GOAL, createdAt, updatedAt);
+  }
+
+  /** Reconstitution constructor including the stored daily goal. */
+  public static UserAccount reconstitute(
+      OwnerId id,
+      String email,
+      String displayName,
+      UserAccountStatus status,
+      int dailyGoal,
+      Instant createdAt,
+      Instant updatedAt) {
     Objects.requireNonNull(id, "UserAccount id must not be null");
     validateEmail(email);
     Objects.requireNonNull(status, "UserAccount status must not be null");
+    validateDailyGoal(dailyGoal);
     Objects.requireNonNull(createdAt, "UserAccount createdAt must not be null");
     Objects.requireNonNull(updatedAt, "UserAccount updatedAt must not be null");
-    return new UserAccount(id, email, displayName, status, createdAt, updatedAt);
+    return new UserAccount(id, email, displayName, status, dailyGoal, createdAt, updatedAt);
   }
 
   /**
@@ -98,6 +123,17 @@ public final class UserAccount {
     validateEmail(newEmail);
     this.email = newEmail;
     this.displayName = coerceDisplayName(newDisplayName, newEmail);
+    this.updatedAt = Instant.now();
+  }
+
+  /**
+   * Updates the user's daily study goal (number of cards/day).
+   *
+   * @param newDailyGoal between 1 and 1000 inclusive
+   */
+  public void updateDailyGoal(int newDailyGoal) {
+    validateDailyGoal(newDailyGoal);
+    this.dailyGoal = newDailyGoal;
     this.updatedAt = Instant.now();
   }
 
@@ -121,6 +157,10 @@ public final class UserAccount {
     return status;
   }
 
+  public int getDailyGoal() {
+    return dailyGoal;
+  }
+
   public Instant getCreatedAt() {
     return createdAt;
   }
@@ -141,6 +181,15 @@ public final class UserAccount {
       throw new DomainValidationException(
           "email",
           "exceeds %d character limit (got %d)".formatted(MAX_EMAIL_LENGTH, email.length()));
+    }
+  }
+
+  private static void validateDailyGoal(int dailyGoal) {
+    if (dailyGoal < MIN_DAILY_GOAL || dailyGoal > MAX_DAILY_GOAL) {
+      throw new DomainValidationException(
+          "dailyGoal",
+          "must be between %d and %d inclusive (got %d)"
+              .formatted(MIN_DAILY_GOAL, MAX_DAILY_GOAL, dailyGoal));
     }
   }
 

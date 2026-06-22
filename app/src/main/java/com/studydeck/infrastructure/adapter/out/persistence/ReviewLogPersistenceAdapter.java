@@ -98,6 +98,25 @@ class ReviewLogPersistenceAdapter implements ReviewLogRepository {
     return jpaRepo.averageRetention30d(ownerId.value(), deckId.value(), since);
   }
 
+  @Override
+  @Transactional(readOnly = true)
+  public long countReviewedTodayGlobal(OwnerId ownerId, Instant dayStart, Instant dayEnd) {
+    return jpaRepo.countReviewedTodayGlobal(ownerId.value(), dayStart, dayEnd);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public java.util.List<java.time.LocalDate> distinctReviewDays(
+      OwnerId ownerId, java.time.ZoneId zone) {
+    return jpaRepo.distinctReviewDays(ownerId.value(), zone.getId());
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public Double averageRetentionGlobal(OwnerId ownerId, Instant since) {
+    return jpaRepo.averageRetentionGlobal(ownerId.value(), since);
+  }
+
   private ReviewLog toDomain(ReviewLogJpaEntity e) {
     return new ReviewLog(
         new CardId(e.getCardId()),

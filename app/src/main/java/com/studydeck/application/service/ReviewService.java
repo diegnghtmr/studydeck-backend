@@ -274,6 +274,7 @@ public final class ReviewService
         scheduleStateRepository
             .findDueCardIds(query.ownerId(), query.deckId(), now, Integer.MAX_VALUE)
             .size();
+    long newCardsL = scheduleStateRepository.countNewByDeck(query.ownerId(), query.deckId());
     int reviewedToday =
         reviewLogRepository.countReviewedToday(query.ownerId(), query.deckId(), dayStart, dayEnd);
     long suspendedL = cardRepository.countAll(query.deckId(), true);
@@ -288,6 +289,7 @@ public final class ReviewService
         (int) totalNotesL,
         (int) totalCardsL,
         (int) dueCountL,
+        (int) newCardsL,
         reviewedToday,
         (int) suspendedL,
         againRate,

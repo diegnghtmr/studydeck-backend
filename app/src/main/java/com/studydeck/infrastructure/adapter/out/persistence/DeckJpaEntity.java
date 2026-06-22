@@ -40,6 +40,10 @@ class DeckJpaEntity {
   @Column(nullable = false)
   private boolean archived;
 
+  @Column private String icon;
+
+  @Column private String color;
+
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
 
@@ -104,6 +108,22 @@ class DeckJpaEntity {
 
   void setArchived(boolean archived) {
     this.archived = archived;
+  }
+
+  String getIcon() {
+    return icon;
+  }
+
+  void setIcon(String icon) {
+    this.icon = icon;
+  }
+
+  String getColor() {
+    return color;
+  }
+
+  void setColor(String color) {
+    this.color = color;
   }
 
   Instant getCreatedAt() {

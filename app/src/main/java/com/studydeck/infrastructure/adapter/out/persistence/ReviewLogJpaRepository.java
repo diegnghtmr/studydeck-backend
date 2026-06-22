@@ -79,4 +79,42 @@ interface ReviewLogJpaRepository extends JpaRepository<ReviewLogJpaEntity, UUID>
       nativeQuery = true)
   Double averageRetention30d(
       @Param("ownerId") UUID ownerId, @Param("deckId") UUID deckId, @Param("since") Instant since);
+
+  /** Counts reviews for an owner across ALL decks in [dayStart, dayEnd). */
+  @Query(
+      value =
+          "SELECT COUNT(*) FROM review_log "
+              + "WHERE owner_id = :ownerId "
+              + "AND reviewed_at >= :dayStart "
+              + "AND reviewed_at < :dayEnd",
+      nativeQuery = true)
+  long countReviewedTodayGlobal(
+      @Param("ownerId") UUID ownerId,
+      @Param("dayStart") Instant dayStart,
+      @Param("dayEnd") Instant dayEnd);
+
+  /**
+   * Returns distinct calendar dates (in given IANA timezone) ordered descending. Uses PostgreSQL AT
+   * TIME ZONE. The {@code ::date} projection maps directly to {@link java.time.LocalDate} under
+   * Hibernate, so the adapter consumes the list as-is.
+   */
+  @Query(
+      value =
+          "SELECT DISTINCT (reviewed_at AT TIME ZONE :tz)::date AS review_date "
+              + "FROM review_log "
+              + "WHERE owner_id = :ownerId "
+              + "ORDER BY review_date DESC",
+      nativeQuery = true)
+  java.util.List<java.time.LocalDate> distinctReviewDays(
+      @Param("ownerId") UUID ownerId, @Param("tz") String tz);
+
+  /** Computes average retention (non-AGAIN fraction) over [since, now) across ALL decks. */
+  @Query(
+      value =
+          "SELECT CAST(SUM(CASE WHEN rating != 'AGAIN' THEN 1 ELSE 0 END) AS DOUBLE PRECISION) "
+              + "/ NULLIF(COUNT(*), 0) "
+              + "FROM review_log "
+              + "WHERE owner_id = :ownerId AND reviewed_at >= :since",
+      nativeQuery = true)
+  Double averageRetentionGlobal(@Param("ownerId") UUID ownerId, @Param("since") Instant since);
 }

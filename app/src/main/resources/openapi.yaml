@@ -1953,6 +1953,16 @@ components:
                 type: string
             archived:
               type: boolean
+            icon:
+              type: string
+              maxLength: 40
+              nullable: true
+              description: User-chosen glyph name. Null = id-derived default.
+            color:
+              type: string
+              pattern: "^#[0-9a-fA-F]{6}$"
+              nullable: true
+              description: User-chosen accent color (#rrggbb). Null = id-derived default.
             defaultDesiredRetention:
               type: number
               minimum: 0.7
@@ -1981,6 +1991,12 @@ components:
           minimum: 0.7
           maximum: 0.99
           default: 0.9
+        icon:
+          type: string
+          maxLength: 40
+        color:
+          type: string
+          pattern: "^#[0-9a-fA-F]{6}$"
 
     DeckPatchRequest:
       type: object
@@ -2003,11 +2019,25 @@ components:
           type: number
           minimum: 0.7
           maximum: 0.99
+        icon:
+          type: string
+          maxLength: 40
+        color:
+          type: string
+          pattern: "^#[0-9a-fA-F]{6}$"
 
     DeckStats:
       type: object
       required:
-        [deckId, totalNotes, totalCards, dueToday, reviewedToday, suspendedCards]
+        [
+          deckId,
+          totalNotes,
+          totalCards,
+          dueToday,
+          newCards,
+          reviewedToday,
+          suspendedCards,
+        ]
       properties:
         deckId:
           type: string
@@ -2018,6 +2048,9 @@ components:
           type: integer
         dueToday:
           type: integer
+        newCards:
+          type: integer
+          description: Cards in NEW state (or with no schedule row) in this deck.
         reviewedToday:
           type: integer
         suspendedCards:

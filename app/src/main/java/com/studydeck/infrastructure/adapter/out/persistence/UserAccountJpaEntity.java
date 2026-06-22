@@ -27,6 +27,9 @@ class UserAccountJpaEntity {
   @Column(nullable = false)
   private String status;
 
+  @Column(name = "daily_goal", nullable = false)
+  private int dailyGoal = 40;
+
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
 
@@ -67,6 +70,14 @@ class UserAccountJpaEntity {
 
   void setStatus(String status) {
     this.status = status;
+  }
+
+  int getDailyGoal() {
+    return dailyGoal;
+  }
+
+  void setDailyGoal(int dailyGoal) {
+    this.dailyGoal = dailyGoal;
   }
 
   Instant getCreatedAt() {

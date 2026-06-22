@@ -21,6 +21,7 @@ public interface GetDeckStatsQuery {
       int totalNotes,
       int totalCards,
       int dueToday,
+      int newCards,
       int reviewedToday,
       int suspendedCards,
       Double againRate7d,

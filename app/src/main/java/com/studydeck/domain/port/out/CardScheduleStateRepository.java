@@ -27,4 +27,16 @@ public interface CardScheduleStateRepository {
    * optionally filtered by deck. Results are ordered by due_at asc and limited to {@code limit}.
    */
   List<CardId> findDueCardIds(OwnerId ownerId, DeckId deckId, Instant dueAt, int limit);
+
+  /**
+   * Counts cards with due_at <= {@code now} across ALL decks for this owner. COUNT query in SQL —
+   * must NOT load IDs into Java.
+   */
+  long countDueGlobal(OwnerId ownerId, Instant now);
+
+  /** Counts cards in NEW state OR with no schedule row across ALL decks for this owner. */
+  long countNewGlobal(OwnerId ownerId);
+
+  /** Counts cards in NEW state OR with no schedule row within a single deck for this owner. */
+  long countNewByDeck(OwnerId ownerId, DeckId deckId);
 }

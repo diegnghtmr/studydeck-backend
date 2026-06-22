@@ -32,7 +32,9 @@ public interface UpdateDeckUseCase {
       String title,
       String description,
       List<String> tags,
-      double defaultDesiredRetention) {
+      double defaultDesiredRetention,
+      String icon,
+      String color) {
 
     public Command {
       if (ownerId == null) {
@@ -56,9 +58,20 @@ public interface UpdateDeckUseCase {
       }
     }
 
-    /** Convenience constructor using default retention (0.9) and no tags. */
+    /** Convenience constructor using default retention (0.9), no tags, no appearance change. */
     public Command(OwnerId ownerId, DeckId deckId, String title, String description) {
-      this(ownerId, deckId, title, description, null, 0.9);
+      this(ownerId, deckId, title, description, null, 0.9, null, null);
+    }
+
+    /** Convenience constructor without appearance change (icon/color cleared to id-derived). */
+    public Command(
+        OwnerId ownerId,
+        DeckId deckId,
+        String title,
+        String description,
+        List<String> tags,
+        double defaultDesiredRetention) {
+      this(ownerId, deckId, title, description, tags, defaultDesiredRetention, null, null);
     }
   }
 }

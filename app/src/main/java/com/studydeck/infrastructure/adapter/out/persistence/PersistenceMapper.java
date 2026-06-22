@@ -56,6 +56,8 @@ class PersistenceMapper {
         e.getTags(),
         e.getDefaultDesiredRetention(),
         e.isArchived(),
+        e.getIcon(),
+        e.getColor(),
         e.getCreatedAt(),
         e.getUpdatedAt());
   }
@@ -69,6 +71,8 @@ class PersistenceMapper {
     e.setTags(deck.getTags());
     e.setDefaultDesiredRetention(deck.getDefaultDesiredRetention());
     e.setArchived(deck.isArchived());
+    e.setIcon(deck.getIcon());
+    e.setColor(deck.getColor());
     e.setCreatedAt(deck.getCreatedAt());
     e.setUpdatedAt(deck.getUpdatedAt());
     return e;
@@ -146,6 +150,7 @@ class PersistenceMapper {
         e.getEmail(),
         e.getDisplayName(),
         UserAccountStatus.valueOf(e.getStatus()),
+        e.getDailyGoal(),
         e.getCreatedAt(),
         e.getUpdatedAt());
   }
@@ -156,6 +161,7 @@ class PersistenceMapper {
     e.setEmail(account.getEmail());
     e.setDisplayName(account.getDisplayName());
     e.setStatus(account.getStatus().name());
+    e.setDailyGoal(account.getDailyGoal());
     e.setCreatedAt(account.getCreatedAt());
     e.setUpdatedAt(account.getUpdatedAt());
     return e;

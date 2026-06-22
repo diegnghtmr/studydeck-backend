@@ -82,7 +82,13 @@ class DeckController {
         request.defaultDesiredRetention() != null ? request.defaultDesiredRetention() : 0.9;
     var command =
         new CreateDeckUseCase.Command(
-            ownerId, request.title(), request.description(), request.tags(), retention);
+            ownerId,
+            request.title(),
+            request.description(),
+            request.tags(),
+            retention,
+            request.icon(),
+            request.color());
     DeckId deckId = createDeck.execute(command);
     Deck deck = getDeck.execute(new GetDeckQuery.Query(ownerId, deckId));
     URI location = URI.create("/v1/decks/" + deckId.value());
@@ -134,8 +140,11 @@ class DeckController {
           request.defaultDesiredRetention() != null
               ? request.defaultDesiredRetention()
               : current.getDefaultDesiredRetention();
+      String icon = request.icon() != null ? request.icon() : current.getIcon();
+      String color = request.color() != null ? request.color() : current.getColor();
       updateDeck.execute(
-          new UpdateDeckUseCase.Command(ownerId, did, title, description, tags, retention));
+          new UpdateDeckUseCase.Command(
+              ownerId, did, title, description, tags, retention, icon, color));
     }
 
     Deck updated = getDeck.execute(new GetDeckQuery.Query(ownerId, did));
@@ -154,6 +163,7 @@ class DeckController {
             stats.totalNotes(),
             stats.totalCards(),
             stats.dueToday(),
+            stats.newCards(),
             stats.reviewedToday(),
             stats.suspendedCards(),
             stats.againRate7d(),

@@ -127,6 +127,34 @@ class DeckPersistenceAdapterTest {
     }
 
     @Test
+    @DisplayName("round-trips user-chosen icon and color")
+    void roundTripsAppearance() {
+      DeckId id = DeckId.generate();
+      Deck deck = Deck.create(id, alice, "Bio", null);
+      deck.customizeAppearance("beaker", "#ff3e00");
+      deckRepository.save(deck);
+      em.flush();
+      em.clear();
+
+      Deck loaded = deckRepository.findById(id).orElseThrow();
+      assertThat(loaded.getIcon()).isEqualTo("beaker");
+      assertThat(loaded.getColor()).isEqualTo("#ff3e00");
+    }
+
+    @Test
+    @DisplayName("defaults icon and color to null when not customized")
+    void appearanceDefaultsToNull() {
+      DeckId id = DeckId.generate();
+      deckRepository.save(Deck.create(id, alice, "Plain", null));
+      em.flush();
+      em.clear();
+
+      Deck loaded = deckRepository.findById(id).orElseThrow();
+      assertThat(loaded.getIcon()).isNull();
+      assertThat(loaded.getColor()).isNull();
+    }
+
+    @Test
     @DisplayName("updates an existing deck on second save")
     void updatesDeck() {
       DeckId id = DeckId.generate();

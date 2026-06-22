@@ -23,6 +23,8 @@ public class DeckWebMapper {
         deck.getDescription(),
         List.copyOf(deck.getTags()),
         deck.isArchived(),
+        deck.getIcon(),
+        deck.getColor(),
         deck.getDefaultDesiredRetention(),
         deck.getCreatedAt(),
         deck.getUpdatedAt());

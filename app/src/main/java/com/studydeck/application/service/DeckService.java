@@ -63,6 +63,9 @@ public final class DeckService
             command.description(),
             command.tags(),
             command.defaultDesiredRetention());
+    if (command.icon() != null || command.color() != null) {
+      deck.customizeAppearance(command.icon(), command.color());
+    }
     deckRepository.save(deck);
     auditPort.record(command.ownerId(), "deck.created", "Deck", id.toString());
     return id;
@@ -105,6 +108,9 @@ public final class DeckService
     Deck deck = findOwnedDeck(command.ownerId(), command.deckId());
     deck.update(
         command.title(), command.description(), command.tags(), command.defaultDesiredRetention());
+    if (command.icon() != null || command.color() != null) {
+      deck.customizeAppearance(command.icon(), command.color());
+    }
     deckRepository.save(deck);
     auditPort.record(command.ownerId(), "deck.updated", "Deck", command.deckId().toString());
   }

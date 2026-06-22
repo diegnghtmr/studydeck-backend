@@ -27,6 +27,8 @@ public final class Deck {
   private static final double MIN_RETENTION = 0.70;
   private static final double MAX_RETENTION = 0.99;
 
+  private static final int MAX_ICON_LENGTH = 40;
+
   private final DeckId id;
   private final OwnerId ownerId;
   private String title;
@@ -34,6 +36,9 @@ public final class Deck {
   private List<String> tags;
   private double defaultDesiredRetention;
   private boolean archived;
+  // Optional user-chosen appearance. Null → the UI derives a stable icon/color from the deck id.
+  private String icon;
+  private String color;
   private final Instant createdAt;
   private Instant updatedAt;
 
@@ -45,6 +50,8 @@ public final class Deck {
       List<String> tags,
       double defaultDesiredRetention,
       boolean archived,
+      String icon,
+      String color,
       Instant createdAt,
       Instant updatedAt) {
     this.id = id;
@@ -54,6 +61,8 @@ public final class Deck {
     this.tags = tags;
     this.defaultDesiredRetention = defaultDesiredRetention;
     this.archived = archived;
+    this.icon = icon;
+    this.color = color;
     this.createdAt = createdAt;
     this.updatedAt = updatedAt;
   }
@@ -83,7 +92,17 @@ public final class Deck {
     List<String> safeTags = (tags == null) ? List.of() : List.copyOf(tags);
     Instant now = Instant.now();
     return new Deck(
-        id, ownerId, title, description, safeTags, defaultDesiredRetention, false, now, now);
+        id,
+        ownerId,
+        title,
+        description,
+        safeTags,
+        defaultDesiredRetention,
+        false,
+        null,
+        null,
+        now,
+        now);
   }
 
   /**
@@ -98,7 +117,7 @@ public final class Deck {
     return create(id, ownerId, title, description, null, DEFAULT_RETENTION);
   }
 
-  /** Reconstitution constructor for persistence adapters (package-private by convention). */
+  /** Reconstitution constructor for persistence adapters (no stored appearance). */
   public static Deck reconstitute(
       DeckId id,
       OwnerId ownerId,
@@ -109,11 +128,40 @@ public final class Deck {
       boolean archived,
       Instant createdAt,
       Instant updatedAt) {
+    return reconstitute(
+        id,
+        ownerId,
+        title,
+        description,
+        tags,
+        defaultDesiredRetention,
+        archived,
+        null,
+        null,
+        createdAt,
+        updatedAt);
+  }
+
+  /** Reconstitution constructor for persistence adapters, including stored appearance. */
+  public static Deck reconstitute(
+      DeckId id,
+      OwnerId ownerId,
+      String title,
+      String description,
+      List<String> tags,
+      double defaultDesiredRetention,
+      boolean archived,
+      String icon,
+      String color,
+      Instant createdAt,
+      Instant updatedAt) {
     Objects.requireNonNull(id, "Deck id must not be null");
     Objects.requireNonNull(ownerId, "Deck ownerId must not be null");
     validateTitle(title);
     validateDescription(description);
     validateRetention(defaultDesiredRetention);
+    validateIcon(icon);
+    validateColor(color);
     Objects.requireNonNull(createdAt, "Deck createdAt must not be null");
     Objects.requireNonNull(updatedAt, "Deck updatedAt must not be null");
     List<String> safeTags = (tags == null) ? List.of() : List.copyOf(tags);
@@ -125,6 +173,8 @@ public final class Deck {
         safeTags,
         defaultDesiredRetention,
         archived,
+        icon,
+        color,
         createdAt,
         updatedAt);
   }
@@ -173,6 +223,19 @@ public final class Deck {
     this.updatedAt = Instant.now();
   }
 
+  /**
+   * Sets the user-chosen appearance (icon glyph name and accent color). Either may be null to clear
+   * it and fall back to the id-derived default. Validated against loose format rules; the UI
+   * constrains the actual choices.
+   */
+  public void customizeAppearance(String icon, String color) {
+    validateIcon(icon);
+    validateColor(color);
+    this.icon = icon;
+    this.color = color;
+    this.updatedAt = Instant.now();
+  }
+
   // ---------------------------------------------------------------
   // Accessors
   // ---------------------------------------------------------------
@@ -203,6 +266,16 @@ public final class Deck {
 
   public boolean isArchived() {
     return archived;
+  }
+
+  /** User-chosen icon glyph name, or null when the id-derived default should be used. */
+  public String getIcon() {
+    return icon;
+  }
+
+  /** User-chosen accent color (hex), or null when the id-derived default should be used. */
+  public String getColor() {
+    return color;
   }
 
   public Instant getCreatedAt() {
@@ -239,6 +312,29 @@ public final class Deck {
       throw new DomainValidationException(
           "defaultDesiredRetention",
           "must be between 0.70 and 0.99 inclusive (got %s)".formatted(retention));
+    }
+  }
+
+  private static void validateIcon(String icon) {
+    if (icon == null) {
+      return;
+    }
+    if (icon.isBlank()) {
+      throw new DomainValidationException("icon", "must not be blank when provided");
+    }
+    if (icon.length() > MAX_ICON_LENGTH) {
+      throw new DomainValidationException(
+          "icon", "exceeds %d character limit (got %d)".formatted(MAX_ICON_LENGTH, icon.length()));
+    }
+  }
+
+  private static void validateColor(String color) {
+    if (color == null) {
+      return;
+    }
+    if (!color.matches("^#[0-9a-fA-F]{6}$")) {
+      throw new DomainValidationException(
+          "color", "must be a 6-digit hex color like #ff3e00 (got %s)".formatted(color));
     }
   }
 }

@@ -10,6 +10,8 @@ import com.studydeck.application.service.NoteService;
 import com.studydeck.application.service.NoteTypeService;
 import com.studydeck.application.service.ProvisionUserService;
 import com.studydeck.application.service.ReviewService;
+import com.studydeck.application.service.UserPreferencesService;
+import com.studydeck.application.service.UserStatsService;
 import com.studydeck.domain.port.in.ArchiveDeckUseCase;
 import com.studydeck.domain.port.in.CreateDeckUseCase;
 import com.studydeck.domain.port.in.CreateNoteUseCase;
@@ -27,6 +29,7 @@ import com.studydeck.domain.port.in.GetDeckStatsQuery;
 import com.studydeck.domain.port.in.GetNextCardQuery;
 import com.studydeck.domain.port.in.GetNoteQuery;
 import com.studydeck.domain.port.in.GetReviewSessionQuery;
+import com.studydeck.domain.port.in.GetUserStatsQuery;
 import com.studydeck.domain.port.in.ListCardsForNoteQuery;
 import com.studydeck.domain.port.in.ListCardsQuery;
 import com.studydeck.domain.port.in.ListDecksQuery;
@@ -42,6 +45,7 @@ import com.studydeck.domain.port.in.SubmitReviewUseCase;
 import com.studydeck.domain.port.in.UpdateCardUseCase;
 import com.studydeck.domain.port.in.UpdateDeckUseCase;
 import com.studydeck.domain.port.in.UpdateNoteUseCase;
+import com.studydeck.domain.port.in.UpdateUserPreferencesUseCase;
 import com.studydeck.domain.port.in.ValidateImportUseCase;
 import com.studydeck.domain.port.out.AuditEventPort;
 import com.studydeck.domain.port.out.CardRepository;
@@ -85,6 +89,12 @@ public class BeanConfiguration {
   ProvisionUserUseCase provisionUserUseCase(
       UserAccountRepository userAccountRepository, AuditEventPort auditEventPort) {
     return new ProvisionUserService(userAccountRepository, auditEventPort);
+  }
+
+  @Bean
+  UpdateUserPreferencesUseCase updateUserPreferencesUseCase(
+      UserAccountRepository userAccountRepository, AuditEventPort auditEventPort) {
+    return new UserPreferencesService(userAccountRepository, auditEventPort);
   }
 
   // ---------------------------------------------------------------
@@ -507,6 +517,20 @@ public class BeanConfiguration {
         reviewSessionRepository,
         auditEventPort,
         clockPort);
+  }
+
+  // ---------------------------------------------------------------
+  // User stats use case — GetUserStatsQuery implemented by UserStatsService.
+  // ---------------------------------------------------------------
+
+  @Bean
+  GetUserStatsQuery getUserStatsQuery(
+      CardScheduleStateRepository cardScheduleStateRepository,
+      ReviewLogRepository reviewLogRepository,
+      UserAccountRepository userAccountRepository,
+      ClockPort clockPort) {
+    return new UserStatsService(
+        cardScheduleStateRepository, reviewLogRepository, userAccountRepository, clockPort);
   }
 
   // ---------------------------------------------------------------

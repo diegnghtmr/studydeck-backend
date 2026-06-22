@@ -72,4 +72,22 @@ public interface ReviewLogRepository {
    * @return average retention in [0, 1], or null when no reviews exist
    */
   Double averageRetention30d(OwnerId ownerId, DeckId deckId, Instant since);
+
+  /**
+   * Counts reviews for the owner across ALL decks where reviewed_at falls in [dayStart, dayEnd).
+   */
+  long countReviewedTodayGlobal(OwnerId ownerId, Instant dayStart, Instant dayEnd);
+
+  /**
+   * Returns distinct calendar dates (in the given timezone) on which the owner reviewed, ordered
+   * descending. Used for streak computation.
+   */
+  java.util.List<java.time.LocalDate> distinctReviewDays(OwnerId ownerId, java.time.ZoneId zone);
+
+  /**
+   * Computes average retention (non-AGAIN fraction) over [since, now) across ALL decks.
+   *
+   * @return fraction in [0, 1], or null when no reviews exist in the window
+   */
+  Double averageRetentionGlobal(OwnerId ownerId, Instant since);
 }

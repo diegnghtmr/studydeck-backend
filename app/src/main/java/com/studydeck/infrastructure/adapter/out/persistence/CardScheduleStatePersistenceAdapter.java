@@ -67,6 +67,24 @@ class CardScheduleStatePersistenceAdapter implements CardScheduleStateRepository
     return uuids.stream().map(CardId::new).toList();
   }
 
+  @Override
+  @Transactional(readOnly = true)
+  public long countDueGlobal(OwnerId ownerId, Instant now) {
+    return jpaRepo.countDueGlobal(ownerId.value(), now);
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public long countNewGlobal(OwnerId ownerId) {
+    return jpaRepo.countNewGlobal(ownerId.value());
+  }
+
+  @Override
+  @Transactional(readOnly = true)
+  public long countNewByDeck(OwnerId ownerId, DeckId deckId) {
+    return jpaRepo.countNewByDeck(ownerId.value(), deckId.value());
+  }
+
   private CardScheduleState toDomain(CardScheduleStateJpaEntity e) {
     return new CardScheduleState(
         SchedulerAlgorithm.valueOf(e.getAlgorithm()),

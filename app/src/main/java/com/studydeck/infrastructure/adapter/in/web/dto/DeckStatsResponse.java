@@ -8,6 +8,7 @@ public record DeckStatsResponse(
     int totalNotes,
     int totalCards,
     int dueToday,
+    int newCards,
     int reviewedToday,
     int suspendedCards,
     Double againRate7d,

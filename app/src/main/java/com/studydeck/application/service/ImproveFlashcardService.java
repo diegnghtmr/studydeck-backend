@@ -24,16 +24,23 @@ public final class ImproveFlashcardService implements ImproveFlashcardUseCase {
 
   @Override
   public Result execute(Command command) {
-    if (!chatPort.isAvailable()) {
+    // A per-request BYOK override (providerConfig) carries its own baseUrl + apiKey + model,
+    // so it can reach a model even when no global provider is configured. Only reject when
+    // there is no override AND no global provider available.
+    if (command.providerConfig() == null && !chatPort.isAvailable()) {
       throw new AiChatPort.AiChatUnavailableException();
     }
 
     String rawJson =
         chatPort.improveFlashcardRaw(
-            command.noteType(), command.currentContentJson(), command.instruction());
+            command.noteType(),
+            command.currentContentJson(),
+            command.instruction(),
+            command.providerConfig());
 
-    // MANDATORY: validate against schema.
-    String validatedJson = schemaValidator.validateAndReturn(rawJson);
+    // MANDATORY: validate against schema. The improve prompt returns BARE note content (no
+    // envelope, no noteType discriminator), so validate the single note — not the full envelope.
+    String validatedJson = schemaValidator.validateNoteAndReturn(command.noteType(), rawJson);
 
     return new Result(command.noteType(), validatedJson);
   }

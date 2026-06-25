@@ -64,5 +64,31 @@ class RagChatServiceProviderConfigTest {
 
       verify(chatPort).ragChat(anyString(), any(), anyList(), isNull());
     }
+
+    @Test
+    @DisplayName(
+        "when providerConfig is set, it bypasses the global-provider availability check (BYOK)")
+    void providerConfigBypassesGlobalAvailabilityCheck() {
+      // No global provider configured: the BYOK override is the only way to reach a model.
+      when(chatPort.isAvailable()).thenReturn(false);
+      var config =
+          new AiProviderConfig(
+              "https://api.groq.com/openai/v1", "sk-groq-key", "llama-3.3-70b-versatile");
+      var cmd = new RagChatUseCase.Command("question", ownerId, List.of(), 5, config);
+
+      service.execute(cmd);
+
+      verify(chatPort).ragChat(anyString(), any(), anyList(), eq(config));
+    }
+
+    @Test
+    @DisplayName("when providerConfig is null and no global provider, it throws unavailable")
+    void nullProviderConfigWithoutGlobalThrows() {
+      when(chatPort.isAvailable()).thenReturn(false);
+      var cmd = new RagChatUseCase.Command("question", ownerId, List.of(), 5, null);
+
+      org.junit.jupiter.api.Assertions.assertThrows(
+          AiChatPort.AiChatUnavailableException.class, () -> service.execute(cmd));
+    }
   }
 }

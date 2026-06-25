@@ -1,5 +1,6 @@
 package com.studydeck.domain.port.in;
 
+import com.studydeck.domain.model.AiProviderConfig;
 import com.studydeck.domain.model.OwnerId;
 
 /**
@@ -12,7 +13,12 @@ public interface ImproveFlashcardUseCase {
 
   Result execute(Command command);
 
-  record Command(OwnerId ownerId, String noteType, String currentContentJson, String instruction) {}
+  record Command(
+      OwnerId ownerId,
+      String noteType,
+      String currentContentJson,
+      String instruction,
+      AiProviderConfig providerConfig) {}
 
   /**
    * @param improvedJson validated improved card content JSON

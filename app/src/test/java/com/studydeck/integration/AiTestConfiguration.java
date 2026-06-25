@@ -157,7 +157,7 @@ public class AiTestConfiguration {
 
       @Override
       public String improveFlashcardRaw(
-          String noteType, String currentContent, String instruction) {
+          String noteType, String currentContent, String instruction, AiProviderConfig override) {
         throw new AiChatUnavailableException();
       }
     };
@@ -175,6 +175,16 @@ public class AiTestConfiguration {
 
       @Override
       public List<String> validate(String json) {
+        return List.of();
+      }
+
+      @Override
+      public String validateNoteAndReturn(String noteType, String contentJson) {
+        return contentJson;
+      }
+
+      @Override
+      public List<String> validateNote(String noteType, String contentJson) {
         return List.of();
       }
     };

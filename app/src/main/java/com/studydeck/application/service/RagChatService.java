@@ -25,7 +25,10 @@ public final class RagChatService implements RagChatUseCase {
 
   @Override
   public RagAnswer execute(Command command) {
-    if (!chatPort.isAvailable()) {
+    // A per-request BYOK override (providerConfig) carries its own baseUrl + apiKey + model,
+    // so it can reach a model even when no global provider is configured. Only reject when
+    // there is no override AND no global provider available.
+    if (command.providerConfig() == null && !chatPort.isAvailable()) {
       throw new AiChatPort.AiChatUnavailableException();
     }
 

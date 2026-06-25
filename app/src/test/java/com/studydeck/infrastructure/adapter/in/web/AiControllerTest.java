@@ -179,10 +179,10 @@ class AiControllerTest {
   void improve_acceptsContractRequest_andReturnsImprovedContent() throws Exception {
     String improvedJson = "{\"front\": \"Better Q?\", \"back\": \"Better A.\"}";
     when(aiChatPort.isAvailable()).thenReturn(true);
-    when(aiChatPort.improveFlashcardRaw(anyString(), anyString(), anyString()))
+    when(aiChatPort.improveFlashcardRaw(anyString(), anyString(), anyString(), any()))
         .thenReturn(improvedJson);
-    when(aiSchemaValidationPort.validateAndReturn(anyString()))
-        .thenAnswer(inv -> inv.getArgument(0));
+    when(aiSchemaValidationPort.validateNoteAndReturn(anyString(), anyString()))
+        .thenAnswer(inv -> inv.getArgument(1));
 
     String body =
         """

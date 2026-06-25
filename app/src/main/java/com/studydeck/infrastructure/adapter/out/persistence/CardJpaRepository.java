@@ -40,4 +40,45 @@ interface CardJpaRepository extends JpaRepository<CardJpaEntity, UUID> {
       """)
   List<CardJpaEntity> findByDeckId(
       @Param("deckId") UUID deckId, @Param("suspended") Boolean suspended);
+
+  /**
+   * Finds cards owned by {@code ownerId}, joining card -> note -> deck.
+   *
+   * <p>When {@code deckId} is non-null the result is further restricted to that specific deck.
+   * Pagination is via explicit OFFSET/LIMIT parameters to avoid page-number arithmetic.
+   */
+  @Query(
+      value =
+          """
+          SELECT c.* FROM card c
+          JOIN note n ON n.id = c.note_id
+          JOIN deck d ON d.id = n.deck_id
+          WHERE d.owner_id = :ownerId
+            AND (:deckId IS NULL OR n.deck_id = :deckId)
+            AND (:suspended IS NULL OR c.suspended = :suspended)
+          ORDER BY c.created_at ASC
+          LIMIT :lim OFFSET :off
+          """,
+      nativeQuery = true)
+  List<CardJpaEntity> findByOwner(
+      @Param("ownerId") UUID ownerId,
+      @Param("deckId") UUID deckId,
+      @Param("suspended") Boolean suspended,
+      @Param("off") int offset,
+      @Param("lim") int limit);
+
+  /** Counts cards owned by {@code ownerId}, optionally restricted to a specific deck. */
+  @Query(
+      """
+      SELECT count(c) FROM CardJpaEntity c
+      JOIN NoteJpaEntity n ON n.id = c.noteId
+      JOIN DeckJpaEntity d ON d.id = n.deckId
+      WHERE d.ownerId = :ownerId
+        AND (:deckId IS NULL OR n.deckId = :deckId)
+        AND (:suspended IS NULL OR c.suspended = :suspended)
+      """)
+  long countByOwner(
+      @Param("ownerId") UUID ownerId,
+      @Param("deckId") UUID deckId,
+      @Param("suspended") Boolean suspended);
 }

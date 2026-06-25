@@ -69,6 +69,7 @@ public final class RagService implements RagSearchUseCase, RagChatUseCase {
             .toList();
 
     // 3. Delegate to chat port (Spring AI adapter)
-    return chatPort.ragChat(command.message(), command.ownerId(), context);
+    return chatPort.ragChat(
+        command.message(), command.ownerId(), context, command.providerConfig());
   }
 }

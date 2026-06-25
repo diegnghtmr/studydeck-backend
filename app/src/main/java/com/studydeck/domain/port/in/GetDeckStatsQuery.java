@@ -2,6 +2,7 @@ package com.studydeck.domain.port.in;
 
 import com.studydeck.domain.model.DeckId;
 import com.studydeck.domain.model.OwnerId;
+import java.time.ZoneId;
 import java.util.Objects;
 
 /** Input port — deck statistics (GET /v1/decks/{deckId}/stats). */
@@ -9,10 +10,16 @@ public interface GetDeckStatsQuery {
 
   DeckStatsResult execute(Query query);
 
-  record Query(OwnerId ownerId, DeckId deckId) {
+  record Query(OwnerId ownerId, DeckId deckId, ZoneId zone) {
     public Query {
       Objects.requireNonNull(ownerId, "ownerId must not be null");
       Objects.requireNonNull(deckId, "deckId must not be null");
+      Objects.requireNonNull(zone, "zone must not be null");
+    }
+
+    /** Convenience constructor that defaults to UTC (for callers that do not need timezone). */
+    public Query(OwnerId ownerId, DeckId deckId) {
+      this(ownerId, deckId, ZoneId.of("UTC"));
     }
   }
 

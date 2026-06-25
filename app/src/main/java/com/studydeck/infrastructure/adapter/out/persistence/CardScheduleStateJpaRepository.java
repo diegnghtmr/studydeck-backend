@@ -13,10 +13,14 @@ interface CardScheduleStateJpaRepository extends JpaRepository<CardScheduleState
   /**
    * Finds card IDs that are due for a given owner, optionally filtered by deck, ordered by due_at
    * ascending, limited to {@code limit} results.
+   *
+   * <p>Suspended cards are excluded via a JOIN to the {@code card} table — a suspended card that is
+   * technically "due" must not appear in any review queue.
    */
   @Query(
       value =
           "SELECT css.card_id FROM card_schedule_state css "
+              + "JOIN card c ON c.id = css.card_id AND c.suspended = FALSE "
               + "WHERE css.owner_id = :ownerId "
               + "AND (:deckId IS NULL OR css.deck_id = :deckId) "
               + "AND css.due_at <= :dueAt "

@@ -68,6 +68,15 @@ class CardServiceTest {
     cardRepo.setNoteIdToDeckId(
         noteId -> noteRepo.findById(noteId).map(n -> n.getDeckId()).orElse(null));
 
+    // Wire note → owner resolver for card repo owner-scoped filtering
+    cardRepo.setNoteIdToOwnerId(
+        noteId ->
+            noteRepo
+                .findById(noteId)
+                .flatMap(n -> deckRepo.findById(n.getDeckId()))
+                .map(d -> d.getOwnerId())
+                .orElse(null));
+
     InMemoryCardScheduleStateRepository scheduleRepo = new InMemoryCardScheduleStateRepository();
     FixedClockPort clock = FixedClockPort.epoch();
     NoteService noteService =

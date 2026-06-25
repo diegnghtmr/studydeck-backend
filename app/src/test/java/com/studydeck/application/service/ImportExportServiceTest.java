@@ -1,7 +1,9 @@
 package com.studydeck.application.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
+import com.studydeck.application.exception.NotFoundException;
 import com.studydeck.application.support.FixedClockPort;
 import com.studydeck.application.support.InMemoryAuditEventPort;
 import com.studydeck.application.support.InMemoryCardRepository;
@@ -11,6 +13,7 @@ import com.studydeck.application.support.InMemoryImportJobRepository;
 import com.studydeck.application.support.InMemoryNoteHashRepository;
 import com.studydeck.application.support.InMemoryNoteRepository;
 import com.studydeck.application.support.SequentialIdGenerator;
+import com.studydeck.domain.model.Deck;
 import com.studydeck.domain.model.DeckId;
 import com.studydeck.domain.model.NoteType;
 import com.studydeck.domain.model.OwnerId;
@@ -355,7 +358,9 @@ class ImportExportServiceTest {
     @Test
     @DisplayName("preview detects duplicate when hash already exists in target deck")
     void previewDuplicateDetected() {
-      DeckId targetDeck = new DeckId(UUID.randomUUID());
+      // Seed the deck owned by ownerId so ownership check passes
+      DeckId targetDeck = DeckId.generate();
+      deckRepo.save(Deck.create(targetDeck, ownerId, "Target Deck", null));
       NoteImport note = basicNote("What?", "This.");
       hashRepo.addExistingHash(targetDeck, NoteType.BASIC, NoteContentHasher.hash(note));
 
@@ -363,6 +368,40 @@ class ImportExportServiceTest {
       var result = sut.execute(new PreviewImportUseCase.Command(ownerId, payload, targetDeck));
 
       assertThat(result.summary().duplicateCandidates()).isEqualTo(1);
+    }
+
+    @Test
+    @DisplayName(
+        "preview with another owner's deckId throws NotFoundException — hash-oracle IDOR prevented")
+    void previewWithOtherOwnersDeckThrowsNotFound() {
+      // Alice owns this deck
+      OwnerId alice = OwnerId.generate();
+      DeckId aliceDeck = DeckId.generate();
+      deckRepo.save(Deck.create(aliceDeck, alice, "Alice Deck", null));
+
+      // Bob tries to preview against Alice's deck — should be rejected (NotFoundException)
+      OwnerId bob = OwnerId.generate();
+      var payload =
+          new ImportPayload(
+              "1.0", new DeckMeta("Bob Import", null, null), List.of(basicNote("Q", "A")));
+
+      assertThatThrownBy(
+              () -> sut.execute(new PreviewImportUseCase.Command(bob, payload, aliceDeck)))
+          .isInstanceOf(NotFoundException.class);
+    }
+
+    @Test
+    @DisplayName("preview with non-existent deckId throws NotFoundException")
+    void previewWithNonExistentDeckThrowsNotFound() {
+      DeckId nonExistentDeck = DeckId.generate();
+      var payload =
+          new ImportPayload(
+              "1.0", new DeckMeta("Import", null, null), List.of(basicNote("Q", "A")));
+
+      assertThatThrownBy(
+              () ->
+                  sut.execute(new PreviewImportUseCase.Command(ownerId, payload, nonExistentDeck)))
+          .isInstanceOf(NotFoundException.class);
     }
   }
 

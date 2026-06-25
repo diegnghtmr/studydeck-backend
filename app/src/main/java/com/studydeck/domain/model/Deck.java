@@ -190,6 +190,14 @@ public final class Deck {
   }
 
   /**
+   * Unarchives (restores) this deck. Idempotent — calling more than once has no additional effect.
+   */
+  public void unarchive() {
+    this.archived = false;
+    this.updatedAt = Instant.now();
+  }
+
+  /**
    * Updates the deck's mutable fields: title, description, tags, and retention.
    *
    * @param newTitle non-blank, max 120 chars

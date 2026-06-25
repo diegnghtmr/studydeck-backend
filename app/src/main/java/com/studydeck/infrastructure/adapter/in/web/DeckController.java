@@ -12,6 +12,7 @@ import com.studydeck.domain.port.in.GetDeckQuery;
 import com.studydeck.domain.port.in.GetDeckStatsQuery;
 import com.studydeck.domain.port.in.GetDeckStatsQuery.DeckStatsResult;
 import com.studydeck.domain.port.in.ListDecksQuery;
+import com.studydeck.domain.port.in.UnarchiveDeckUseCase;
 import com.studydeck.domain.port.in.UpdateDeckUseCase;
 import com.studydeck.infrastructure.adapter.in.web.dto.DeckCreateRequest;
 import com.studydeck.infrastructure.adapter.in.web.dto.DeckPatchRequest;
@@ -21,6 +22,7 @@ import com.studydeck.infrastructure.adapter.in.web.dto.PagedResponse;
 import com.studydeck.infrastructure.adapter.in.web.mapper.DeckWebMapper;
 import jakarta.validation.Valid;
 import java.net.URI;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Qualifier;
@@ -51,6 +53,7 @@ class DeckController {
   private final GetDeckQuery getDeck;
   private final UpdateDeckUseCase updateDeck;
   private final ArchiveDeckUseCase archiveDeck;
+  private final UnarchiveDeckUseCase unarchiveDeck;
   private final DeleteDeckUseCase deleteDeck;
   private final GetDeckStatsQuery getDeckStats;
   private final DeckWebMapper mapper;
@@ -61,6 +64,7 @@ class DeckController {
       @Qualifier("getDeckQuery") GetDeckQuery getDeck,
       @Qualifier("updateDeckUseCase") UpdateDeckUseCase updateDeck,
       @Qualifier("archiveDeckUseCase") ArchiveDeckUseCase archiveDeck,
+      @Qualifier("unarchiveDeckUseCase") UnarchiveDeckUseCase unarchiveDeck,
       @Qualifier("deleteDeckUseCase") DeleteDeckUseCase deleteDeck,
       @Qualifier("getDeckStatsQuery") GetDeckStatsQuery getDeckStats,
       DeckWebMapper mapper) {
@@ -69,6 +73,7 @@ class DeckController {
     this.getDeck = getDeck;
     this.updateDeck = updateDeck;
     this.archiveDeck = archiveDeck;
+    this.unarchiveDeck = unarchiveDeck;
     this.deleteDeck = deleteDeck;
     this.getDeckStats = getDeckStats;
     this.mapper = mapper;
@@ -119,6 +124,16 @@ class DeckController {
     return ResponseEntity.ok(mapper.toResponse(deck));
   }
 
+  /**
+   * PATCH contract for the {@code archived} field:
+   *
+   * <ul>
+   *   <li>{@code archived=true} — archives the deck; other fields in the same request are ignored
+   *       (archiving is a state transition, not a data update).
+   *   <li>{@code archived=false} — unarchives (restores) the deck; other fields are still applied.
+   *   <li>{@code archived} absent (null) — only the supplied data fields are updated.
+   * </ul>
+   */
   @PatchMapping("/{deckId}")
   ResponseEntity<DeckResponse> patchDeck(
       @PathVariable UUID deckId,
@@ -128,8 +143,13 @@ class DeckController {
     DeckId did = new DeckId(deckId);
 
     if (Boolean.TRUE.equals(request.archived())) {
+      // Archive-only path: other patch fields are silently ignored when archiving.
       archiveDeck.execute(new ArchiveDeckUseCase.Command(ownerId, did));
     } else {
+      // For archived=false, unarchive first, then apply field updates.
+      if (Boolean.FALSE.equals(request.archived())) {
+        unarchiveDeck.execute(new UnarchiveDeckUseCase.Command(ownerId, did));
+      }
       // Resolve current state for fields not provided in the patch
       Deck current = getDeck.execute(new GetDeckQuery.Query(ownerId, did));
       String title = request.title() != null ? request.title() : current.getTitle();
@@ -153,10 +173,13 @@ class DeckController {
 
   @GetMapping("/{deckId}/stats")
   ResponseEntity<DeckStatsResponse> getDeckStats(
-      @PathVariable UUID deckId, @AuthenticationPrincipal Jwt jwt) {
+      @PathVariable UUID deckId,
+      @RequestParam(required = false) String tz,
+      @AuthenticationPrincipal Jwt jwt) {
     OwnerId ownerId = new OwnerId(UUID.fromString(jwt.getSubject()));
+    ZoneId zone = parseZone(tz);
     DeckStatsResult stats =
-        getDeckStats.execute(new GetDeckStatsQuery.Query(ownerId, new DeckId(deckId)));
+        getDeckStats.execute(new GetDeckStatsQuery.Query(ownerId, new DeckId(deckId), zone));
     DeckStatsResponse response =
         new DeckStatsResponse(
             stats.deckId().value(),
@@ -169,6 +192,22 @@ class DeckController {
             stats.againRate7d(),
             stats.averageRetention30d());
     return ResponseEntity.ok(response);
+  }
+
+  // ---------------------------------------------------------------
+  // Private helpers
+  // ---------------------------------------------------------------
+
+  /** Parses an IANA timezone string; falls back to UTC on null or unknown input. */
+  private static ZoneId parseZone(String tz) {
+    if (tz == null || tz.isBlank()) {
+      return ZoneId.of("UTC");
+    }
+    try {
+      return ZoneId.of(tz);
+    } catch (java.time.zone.ZoneRulesException e) {
+      return ZoneId.of("UTC");
+    }
   }
 
   @DeleteMapping("/{deckId}")

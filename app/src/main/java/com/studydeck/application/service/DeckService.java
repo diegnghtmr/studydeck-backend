@@ -10,6 +10,7 @@ import com.studydeck.domain.port.in.CreateDeckUseCase;
 import com.studydeck.domain.port.in.DeleteDeckUseCase;
 import com.studydeck.domain.port.in.GetDeckQuery;
 import com.studydeck.domain.port.in.ListDecksQuery;
+import com.studydeck.domain.port.in.UnarchiveDeckUseCase;
 import com.studydeck.domain.port.in.UpdateDeckUseCase;
 import com.studydeck.domain.port.out.AuditEventPort;
 import com.studydeck.domain.port.out.ClockPort;
@@ -28,6 +29,7 @@ public final class DeckService
         GetDeckQuery,
         UpdateDeckUseCase,
         ArchiveDeckUseCase,
+        UnarchiveDeckUseCase,
         DeleteDeckUseCase {
 
   private final DeckRepository deckRepository;
@@ -125,6 +127,18 @@ public final class DeckService
     deck.archive();
     deckRepository.save(deck);
     auditPort.record(command.ownerId(), "deck.archived", "Deck", command.deckId().toString());
+  }
+
+  // ---------------------------------------------------------------
+  // UnarchiveDeckUseCase
+  // ---------------------------------------------------------------
+
+  @Override
+  public void execute(UnarchiveDeckUseCase.Command command) {
+    Deck deck = findOwnedDeck(command.ownerId(), command.deckId());
+    deck.unarchive();
+    deckRepository.save(deck);
+    auditPort.record(command.ownerId(), "deck.unarchived", "Deck", command.deckId().toString());
   }
 
   // ---------------------------------------------------------------

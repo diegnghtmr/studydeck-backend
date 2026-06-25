@@ -4,6 +4,7 @@ import com.studydeck.domain.model.Card;
 import com.studydeck.domain.model.CardId;
 import com.studydeck.domain.model.DeckId;
 import com.studydeck.domain.model.NoteId;
+import com.studydeck.domain.model.OwnerId;
 import com.studydeck.domain.port.out.CardRepository;
 import java.util.List;
 import java.util.Optional;
@@ -47,32 +48,21 @@ class CardPersistenceAdapter implements CardRepository {
 
   @Override
   @Transactional(readOnly = true)
-  public List<Card> findAll(DeckId deckId, Boolean suspended, int offset, int limit) {
+  public List<Card> findAll(
+      OwnerId ownerId, DeckId deckId, Boolean suspended, int offset, int limit) {
+    var ownerUuid = ownerId.value();
     var deckUuid = (deckId != null) ? deckId.value() : null;
-    if (deckUuid == null) {
-      // No deck filter — search all (rare; for admin-level queries)
-      return jpaRepo.findAll().stream()
-          .filter(c -> suspended == null || c.isSuspended() == suspended)
-          .skip(offset)
-          .limit(limit)
-          .map(mapper::toDomain)
-          .toList();
-    }
-    return jpaRepo.findByDeckId(deckUuid, suspended).stream()
-        .skip(offset)
-        .limit(limit)
+    return jpaRepo.findByOwner(ownerUuid, deckUuid, suspended, offset, limit).stream()
         .map(mapper::toDomain)
         .toList();
   }
 
   @Override
   @Transactional(readOnly = true)
-  public long countAll(DeckId deckId, Boolean suspended) {
+  public long countAll(OwnerId ownerId, DeckId deckId, Boolean suspended) {
+    var ownerUuid = ownerId.value();
     var deckUuid = (deckId != null) ? deckId.value() : null;
-    if (deckUuid == null) {
-      return jpaRepo.count();
-    }
-    return jpaRepo.countByDeckId(deckUuid, suspended);
+    return jpaRepo.countByOwner(ownerUuid, deckUuid, suspended);
   }
 
   @Override

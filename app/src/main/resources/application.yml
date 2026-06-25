@@ -108,6 +108,14 @@ studydeck:
       # Dev default = local Vite dev server. Prod sets the real origin via
       # STUDYDECK_SECURITY_CORS_ALLOWED_ORIGINS. Never hardcoded for prod.
       allowed-origins: ${STUDYDECK_SECURITY_CORS_ALLOWED_ORIGINS:http://localhost:5173}
+    encryption:
+      # AES-256-GCM master key for encrypting stored AI provider API keys.
+      # Must be a Base64-encoded 32-byte value.
+      # Blank (default) = DisabledCryptoAdapter (provider-storage feature unavailable).
+      # Non-blank but invalid length = context startup fails (FAIL FAST — profile-independent).
+      # PRODUCTION: set STUDYDECK_ENCRYPTION_MASTER_KEY to a secret 32-byte Base64 value.
+      # WARNING: rotating this key invalidates all stored ciphertexts (V2 rotation tooling needed).
+      master-key: ${STUDYDECK_ENCRYPTION_MASTER_KEY:}
   ai:
     embedding:
       model-name: ${STUDYDECK_AI_EMBEDDING_MODEL:all-MiniLM-L6-v2}

@@ -11,13 +11,17 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.studydeck.domain.model.AiProviderConfig;
+import com.studydeck.domain.port.in.GetActiveUserAiProviderQuery;
 import com.studydeck.domain.port.out.AiChatPort;
 import com.studydeck.domain.port.out.AiSchemaValidationPort;
 import com.studydeck.integration.AiTestConfiguration;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
 import org.springframework.http.MediaType;
@@ -37,10 +41,13 @@ import org.testcontainers.junit.jupiter.Testcontainers;
  * Web-layer integration test for {@link AiController}.
  *
  * <p>Verifies the controller speaks the openapi contract: the NESTED {@code
- * GenerateFlashcardsRequest} /{@code ImproveFlashcardRequest} request shapes are accepted, the
+ * GenerateFlashcardsRequest}/{@code ImproveFlashcardRequest} request shapes are accepted, the
  * {@code GenerateFlashcardsResponse} ({@code generated[]}) shape is returned, unknown fields are
  * rejected with 400, and a missing chat provider degrades to a 503 {@code
  * application/problem+json}.
+ *
+ * <p>The {@code providerOverride} field has been REMOVED from request DTOs (A-8 refactor). The
+ * controller resolves the active provider server-side via {@link GetActiveUserAiProviderQuery}.
  */
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.MOCK)
 @Import(AiTestConfiguration.class)
@@ -70,6 +77,10 @@ class AiControllerTest {
   @MockitoBean AiChatPort aiChatPort;
   @MockitoBean AiSchemaValidationPort aiSchemaValidationPort;
 
+  @MockitoBean
+  @Qualifier("getActiveUserAiProviderQuery")
+  GetActiveUserAiProviderQuery getActiveUserAiProviderQuery;
+
   MockMvc mockMvc;
 
   private static final UUID OWNER_ID = UUID.fromString("00000000-0000-0000-0000-000000000001");
@@ -96,9 +107,16 @@ class AiControllerTest {
         .authorities(new SimpleGrantedAuthority("SCOPE_ai.generate"));
   }
 
+  // ---------------------------------------------------------------
+  // generate-flashcards — happy path
+  // ---------------------------------------------------------------
+
   @Test
   void generate_acceptsNestedContractRequest_andReturnsGeneratedShape() throws Exception {
     when(aiChatPort.isAvailable()).thenReturn(true);
+    when(getActiveUserAiProviderQuery.execute(any()))
+        .thenReturn(
+            Optional.of(new AiProviderConfig("https://api.openai.com", "sk-testkey", "gpt-4o")));
     when(aiChatPort.generateFlashcardsRaw(anyString(), any(), anyList(), anyInt(), any()))
         .thenReturn(VALID_FLASHCARD_JSON);
     when(aiSchemaValidationPort.validateAndReturn(anyString()))
@@ -123,6 +141,33 @@ class AiControllerTest {
         // content must NOT leak envelope fields
         .andExpect(jsonPath("$.generated[0].content.noteType").doesNotExist());
   }
+
+  // ---------------------------------------------------------------
+  // generate-flashcards — providerOverride rejected (A-8: field removed)
+  // ---------------------------------------------------------------
+
+  @Test
+  void generate_providerOverrideField_returns400_fieldRemovedInA8() throws Exception {
+    when(aiChatPort.isAvailable()).thenReturn(true);
+
+    String body =
+        """
+        {"source": {"type": "text", "content": "text"},
+         "providerOverride": {"baseUrl":"https://api.openai.com","apiKey":"sk-x","model":"gpt-4o"}}
+        """;
+
+    mockMvc
+        .perform(
+            post("/v1/ai/generate-flashcards")
+                .with(aiJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isBadRequest());
+  }
+
+  // ---------------------------------------------------------------
+  // generate-flashcards — validation
+  // ---------------------------------------------------------------
 
   @Test
   void generate_unknownField_returns400() throws Exception {
@@ -155,8 +200,15 @@ class AiControllerTest {
         .andExpect(status().isBadRequest());
   }
 
+  // ---------------------------------------------------------------
+  // generate-flashcards — 503 AiChatUnavailable preserved (A-8 path)
+  // ---------------------------------------------------------------
+
   @Test
-  void generate_noChatProvider_returns503ProblemJson() throws Exception {
+  void generate_noActiveProvider_andNoChatProvider_returns503ProblemJson() throws Exception {
+    // No active provider stored server-side → getActiveUserAiProviderQuery returns empty
+    when(getActiveUserAiProviderQuery.execute(any())).thenReturn(Optional.empty());
+    // No global provider configured either
     when(aiChatPort.isAvailable()).thenReturn(false);
 
     String body = "{\"source\": {\"type\": \"text\", \"content\": \"text\"}}";
@@ -175,10 +227,17 @@ class AiControllerTest {
                     .contains("application/problem+json"));
   }
 
+  // ---------------------------------------------------------------
+  // improve-flashcard — happy path
+  // ---------------------------------------------------------------
+
   @Test
   void improve_acceptsContractRequest_andReturnsImprovedContent() throws Exception {
     String improvedJson = "{\"front\": \"Better Q?\", \"back\": \"Better A.\"}";
     when(aiChatPort.isAvailable()).thenReturn(true);
+    when(getActiveUserAiProviderQuery.execute(any()))
+        .thenReturn(
+            Optional.of(new AiProviderConfig("https://api.openai.com", "sk-testkey", "gpt-4o")));
     when(aiChatPort.improveFlashcardRaw(anyString(), anyString(), anyString(), any()))
         .thenReturn(improvedJson);
     when(aiSchemaValidationPort.validateNoteAndReturn(anyString(), anyString()))
@@ -201,8 +260,36 @@ class AiControllerTest {
         .andExpect(jsonPath("$.content.front").value("Better Q?"));
   }
 
+  // ---------------------------------------------------------------
+  // improve-flashcard — providerOverride rejected (A-8: field removed)
+  // ---------------------------------------------------------------
+
+  @Test
+  void improve_providerOverrideField_returns400_fieldRemovedInA8() throws Exception {
+    when(aiChatPort.isAvailable()).thenReturn(true);
+
+    String body =
+        """
+        {"noteType": "basic", "content": {"front": "Q?", "back": "A."},
+         "providerOverride": {"baseUrl":"https://api.openai.com","apiKey":"sk-x","model":"gpt-4o"}}
+        """;
+
+    mockMvc
+        .perform(
+            post("/v1/ai/improve-flashcard")
+                .with(aiJwt())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isBadRequest());
+  }
+
+  // ---------------------------------------------------------------
+  // improve-flashcard — 503 AiChatUnavailable preserved
+  // ---------------------------------------------------------------
+
   @Test
   void improve_noChatProvider_returns503() throws Exception {
+    when(getActiveUserAiProviderQuery.execute(any())).thenReturn(Optional.empty());
     when(aiChatPort.isAvailable()).thenReturn(false);
 
     String body =

@@ -80,7 +80,11 @@ public class UserAiProviderService
               .orElseThrow(
                   () -> new NotFoundException("UserAiProvider", cmd.idOrNull().toString()));
 
-      provider.updateConfig(cmd.label(), cmd.baseUrl(), cmd.model(), clock.now());
+      // Only update fields when provided; null means "preserve existing value" (used by activate)
+      String label = cmd.label() != null ? cmd.label() : provider.getLabel();
+      String baseUrl = cmd.baseUrl() != null ? cmd.baseUrl() : provider.getBaseUrl();
+      String model = cmd.model() != null ? cmd.model() : provider.getModel();
+      provider.updateConfig(label, baseUrl, model, clock.now());
 
       // Only re-encrypt if a new key was supplied
       if (cmd.plaintextApiKey() != null && !cmd.plaintextApiKey().isBlank()) {

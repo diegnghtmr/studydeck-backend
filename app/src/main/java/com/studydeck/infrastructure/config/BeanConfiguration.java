@@ -28,6 +28,7 @@ import com.studydeck.domain.port.in.GetDeckQuery;
 import com.studydeck.domain.port.in.GetDeckStatsQuery;
 import com.studydeck.domain.port.in.GetNextCardQuery;
 import com.studydeck.domain.port.in.GetNoteQuery;
+import com.studydeck.domain.port.in.GetPreviewIntervalsQuery;
 import com.studydeck.domain.port.in.GetReviewSessionQuery;
 import com.studydeck.domain.port.in.GetUserStatsQuery;
 import com.studydeck.domain.port.in.ListCardsForNoteQuery;
@@ -525,6 +526,29 @@ public class BeanConfiguration {
 
   @Bean
   GetDeckStatsQuery getDeckStatsQuery(
+      DeckRepository deckRepository,
+      NoteRepository noteRepository,
+      CardRepository cardRepository,
+      CardScheduleStateRepository cardScheduleStateRepository,
+      ReviewLogRepository reviewLogRepository,
+      ReviewSessionRepository reviewSessionRepository,
+      AuditEventPort auditEventPort,
+      ClockPort clockPort,
+      UserAccountRepository userAccountRepository) {
+    return reviewService(
+        deckRepository,
+        noteRepository,
+        cardRepository,
+        cardScheduleStateRepository,
+        reviewLogRepository,
+        reviewSessionRepository,
+        auditEventPort,
+        clockPort,
+        userAccountRepository);
+  }
+
+  @Bean
+  GetPreviewIntervalsQuery getPreviewIntervalsQuery(
       DeckRepository deckRepository,
       NoteRepository noteRepository,
       CardRepository cardRepository,

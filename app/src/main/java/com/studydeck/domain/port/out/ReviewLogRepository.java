@@ -90,4 +90,14 @@ public interface ReviewLogRepository {
    * @return fraction in [0, 1], or null when no reviews exist in the window
    */
   Double averageRetentionGlobal(OwnerId ownerId, Instant since);
+
+  /**
+   * Counts distinct card IDs whose FIRST ever review (by this owner) was on or after {@code
+   * dayStart}. This identifies cards that were NEW and first introduced today.
+   *
+   * @param ownerId the reviewing user
+   * @param dayStart start of the user's local day in UTC
+   * @return count of new cards introduced today
+   */
+  int countNewCardsIntroducedToday(OwnerId ownerId, Instant dayStart);
 }

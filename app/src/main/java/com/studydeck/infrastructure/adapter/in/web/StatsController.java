@@ -56,7 +56,8 @@ class StatsController {
             stats.desiredRetention(),
             stats.newCardsPerDay(),
             stats.language(),
-            stats.timezone());
+            stats.timezone(),
+            stats.schedulerAlgorithm() != null ? stats.schedulerAlgorithm().name() : null);
     return ResponseEntity.ok(response);
   }
 

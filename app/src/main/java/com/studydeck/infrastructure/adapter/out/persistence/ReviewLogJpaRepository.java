@@ -117,4 +117,23 @@ interface ReviewLogJpaRepository extends JpaRepository<ReviewLogJpaEntity, UUID>
               + "WHERE owner_id = :ownerId AND reviewed_at >= :since",
       nativeQuery = true)
   Double averageRetentionGlobal(@Param("ownerId") UUID ownerId, @Param("since") Instant since);
+
+  /**
+   * Counts distinct card IDs whose first review by the owner was on or after dayStart. These are
+   * cards that were NEW and first introduced today.
+   */
+  @Query(
+      value =
+          "SELECT COUNT(DISTINCT rl.card_id) FROM review_log rl "
+              + "WHERE rl.owner_id = :ownerId "
+              + "AND rl.reviewed_at >= :dayStart "
+              + "AND NOT EXISTS ("
+              + "  SELECT 1 FROM review_log rl2 "
+              + "  WHERE rl2.card_id = rl.card_id "
+              + "    AND rl2.owner_id = :ownerId "
+              + "    AND rl2.reviewed_at < :dayStart"
+              + ")",
+      nativeQuery = true)
+  int countNewCardsIntroducedToday(
+      @Param("ownerId") UUID ownerId, @Param("dayStart") Instant dayStart);
 }

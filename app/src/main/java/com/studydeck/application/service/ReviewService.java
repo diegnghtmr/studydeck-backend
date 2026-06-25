@@ -11,12 +11,14 @@ import com.studydeck.domain.model.DeckId;
 import com.studydeck.domain.model.Note;
 import com.studydeck.domain.model.OwnerId;
 import com.studydeck.domain.model.ReviewLog;
+import com.studydeck.domain.model.ReviewRating;
 import com.studydeck.domain.model.ReviewResult;
 import com.studydeck.domain.model.SchedulerAlgorithm;
 import com.studydeck.domain.model.SchedulerPreset;
 import com.studydeck.domain.model.UserAccount;
 import com.studydeck.domain.port.in.GetDeckStatsQuery;
 import com.studydeck.domain.port.in.GetNextCardQuery;
+import com.studydeck.domain.port.in.GetPreviewIntervalsQuery;
 import com.studydeck.domain.port.in.GetReviewSessionQuery;
 import com.studydeck.domain.port.in.ListDueCardsQuery;
 import com.studydeck.domain.port.in.ListReviewHistoryQuery;
@@ -59,7 +61,8 @@ public final class ReviewService
         SubmitReviewUseCase,
         ListDueCardsQuery,
         ListReviewHistoryQuery,
-        GetDeckStatsQuery {
+        GetDeckStatsQuery,
+        GetPreviewIntervalsQuery {
 
   private static final int DEFAULT_MAX_CARDS = 20;
 
@@ -156,6 +159,34 @@ public final class ReviewService
     }
 
     CardId nextId = dueIds.get(0);
+
+    // Check if this is a NEW card (no schedule state or state == NEW)
+    boolean isNewCard =
+        scheduleStateRepository
+            .findByCardId(nextId)
+            .map(s -> s.state() == CardState.NEW)
+            .orElse(true);
+
+    if (isNewCard) {
+      // Enforce new-cards-per-day cap
+      UserAccount user = userAccountRepository.findById(query.ownerId()).orElse(null);
+      if (user != null && user.getNewCardsPerDay() > 0) {
+        ZoneId zone = ZoneId.of(user.getTimezone());
+        Instant dayStart = now.atZone(zone).toLocalDate().atStartOfDay(zone).toInstant();
+        int introToday =
+            reviewLogRepository.countNewCardsIntroducedToday(query.ownerId(), dayStart);
+        if (introToday >= user.getNewCardsPerDay()) {
+          // Cap hit — fall back to review (non-NEW) cards only
+          List<CardId> reviewIds =
+              scheduleStateRepository.findDueReviewCardIds(query.ownerId(), deckId, now, 1);
+          if (reviewIds.isEmpty()) {
+            return Optional.empty();
+          }
+          nextId = reviewIds.get(0);
+        }
+      }
+    }
+
     Optional<Card> card = cardRepository.findById(nextId);
     if (card.isPresent()) {
       sessionRepository.incrementPresentedCount(query.sessionId());
@@ -180,7 +211,7 @@ public final class ReviewService
             .orElseGet(() -> CardScheduleState.newFsrsCard(now));
 
     // 3. Resolve scheduler preset for the deck
-    SchedulerPreset preset = resolvePreset(card, command.ownerId());
+    SchedulerPreset preset = resolvePreset(command.ownerId());
 
     // 4. Select the correct scheduling engine
     SchedulingEngine engine = engineFor(current.algorithm());
@@ -339,14 +370,15 @@ public final class ReviewService
     return card;
   }
 
-  private SchedulerPreset resolvePreset(Card card, OwnerId ownerId) {
-    double retention =
-        userAccountRepository
-            .findById(ownerId)
-            .map(UserAccount::getDesiredRetention)
-            .map(r -> Math.max(0.70, r))
-            .orElse(0.9);
-    return SchedulerPreset.defaults(SchedulerAlgorithm.FSRS, retention);
+  private SchedulerPreset resolvePreset(OwnerId ownerId) {
+    return userAccountRepository
+        .findById(ownerId)
+        .map(
+            user -> {
+              double r = Math.max(0.70, user.getDesiredRetention());
+              return SchedulerPreset.defaults(user.getSchedulerAlgorithm(), r);
+            })
+        .orElse(SchedulerPreset.defaults(SchedulerAlgorithm.FSRS, 0.9));
   }
 
   private SchedulingEngine engineFor(SchedulerAlgorithm algorithm) {
@@ -362,5 +394,32 @@ public final class ReviewService
     }
     long seconds = Duration.between(current.lastReviewedAt(), now).getSeconds();
     return (int) Math.max(0, seconds / 86400L);
+  }
+
+  // ---------------------------------------------------------------
+  // GetPreviewIntervalsQuery
+  // ---------------------------------------------------------------
+
+  @Override
+  public GetPreviewIntervalsQuery.PreviewIntervals execute(GetPreviewIntervalsQuery.Query query) {
+    Instant now = clockPort.now();
+    CardScheduleState schedState =
+        scheduleStateRepository
+            .findByCardId(query.cardId())
+            .orElseGet(() -> CardScheduleState.newFsrsCard(now));
+    SchedulerPreset preset = resolvePreset(query.ownerId());
+    SchedulingEngine engine = engineFor(preset.algorithm());
+    double retention = preset.desiredRetention();
+
+    int again =
+        engine.schedule(schedState, ReviewRating.AGAIN, now, retention).nextState().scheduledDays();
+    int hard =
+        engine.schedule(schedState, ReviewRating.HARD, now, retention).nextState().scheduledDays();
+    int good =
+        engine.schedule(schedState, ReviewRating.GOOD, now, retention).nextState().scheduledDays();
+    int easy =
+        engine.schedule(schedState, ReviewRating.EASY, now, retention).nextState().scheduledDays();
+
+    return new GetPreviewIntervalsQuery.PreviewIntervals(again, hard, good, easy);
   }
 }

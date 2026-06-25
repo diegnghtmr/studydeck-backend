@@ -2,6 +2,7 @@ package com.studydeck.application.support;
 
 import com.studydeck.domain.model.CardId;
 import com.studydeck.domain.model.CardScheduleState;
+import com.studydeck.domain.model.CardState;
 import com.studydeck.domain.model.DeckId;
 import com.studydeck.domain.model.OwnerId;
 import com.studydeck.domain.port.out.CardScheduleStateRepository;
@@ -61,6 +62,18 @@ public final class InMemoryCardScheduleStateRepository implements CardScheduleSt
     // countNewGlobal scoped to the owner. Deck-accurate counting is covered by the JPA adapter
     // test.
     return countNewGlobal(ownerId);
+  }
+
+  @Override
+  public List<CardId> findDueReviewCardIds(
+      OwnerId ownerId, DeckId deckId, Instant dueAt, int limit) {
+    return store.entrySet().stream()
+        .filter(e -> e.getValue().ownerId().equals(ownerId))
+        .filter(e -> !e.getValue().state().dueAt().isAfter(dueAt))
+        .filter(e -> e.getValue().state().state() != CardState.NEW)
+        .map(Map.Entry::getKey)
+        .limit(limit)
+        .toList();
   }
 
   // Test helpers

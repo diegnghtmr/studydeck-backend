@@ -1,9 +1,14 @@
 package com.studydeck.infrastructure.adapter.out.idp;
 
+import com.studydeck.domain.model.IdpSession;
 import com.studydeck.domain.port.out.IdpAdminPort;
+import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.http.MediaType;
 import org.springframework.web.client.RestClient;
 import org.springframework.web.client.RestClientException;
@@ -74,6 +79,80 @@ class KeycloakAdminAdapter implements IdpAdminPort {
     } catch (RestClientException e) {
       throw new IdpAdminException("Failed to logout Keycloak user " + idpUserId, e);
     }
+  }
+
+  @Override
+  public List<IdpSession> listSessions(String idpUserId) {
+    String token = acquireAdminToken();
+    String url = baseUrl + "/admin/realms/" + realm + "/users/" + idpUserId + "/sessions";
+    try {
+      List<Map<String, Object>> response =
+          restClient
+              .get()
+              .uri(url)
+              .header("Authorization", "Bearer " + token)
+              .retrieve()
+              .body(new ParameterizedTypeReference<List<Map<String, Object>>>() {});
+      if (response == null) {
+        return List.of();
+      }
+      List<IdpSession> sessions = new ArrayList<>();
+      for (Map<String, Object> entry : response) {
+        sessions.add(mapToIdpSession(entry));
+      }
+      return List.copyOf(sessions);
+    } catch (RestClientException e) {
+      throw new IdpAdminException("Failed to list sessions for Keycloak user " + idpUserId, e);
+    }
+  }
+
+  @Override
+  public void revokeSession(String sessionId) {
+    String token = acquireAdminToken();
+    String url = baseUrl + "/admin/realms/" + realm + "/sessions/" + sessionId;
+    try {
+      restClient
+          .delete()
+          .uri(url)
+          .header("Authorization", "Bearer " + token)
+          .retrieve()
+          .toBodilessEntity();
+      log.debug("Revoked Keycloak session {}", sessionId);
+    } catch (RestClientException e) {
+      throw new IdpAdminException("Failed to revoke Keycloak session " + sessionId, e);
+    }
+  }
+
+  private IdpSession mapToIdpSession(Map<String, Object> entry) {
+    String id = entry.containsKey("id") ? String.valueOf(entry.get("id")) : "unknown";
+    String ipAddress =
+        entry.containsKey("ipAddress") ? String.valueOf(entry.get("ipAddress")) : "unknown";
+
+    Instant started = Instant.EPOCH;
+    if (entry.containsKey("start")) {
+      Object start = entry.get("start");
+      if (start instanceof Number n) {
+        started = Instant.ofEpochMilli(n.longValue());
+      }
+    }
+
+    Instant lastAccess = Instant.EPOCH;
+    if (entry.containsKey("lastAccess")) {
+      Object la = entry.get("lastAccess");
+      if (la instanceof Number n) {
+        lastAccess = Instant.ofEpochMilli(n.longValue());
+      }
+    }
+
+    List<String> clients = List.of();
+    if (entry.containsKey("clients")) {
+      Object clientsObj = entry.get("clients");
+      if (clientsObj instanceof Map<?, ?> clientsMap) {
+        clients = clientsMap.values().stream().map(Object::toString).toList();
+      }
+    }
+
+    return new IdpSession(id, ipAddress, started, lastAccess, clients);
   }
 
   private String acquireAdminToken() {

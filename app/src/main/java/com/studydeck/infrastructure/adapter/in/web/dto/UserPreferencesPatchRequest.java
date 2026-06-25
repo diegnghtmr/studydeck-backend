@@ -15,4 +15,6 @@ public record UserPreferencesPatchRequest(
     @DecimalMin("0.50") @DecimalMax("0.99") Double desiredRetention,
     @Min(0) @Max(999) Integer newCardsPerDay,
     @Pattern(regexp = "^(en|es|fr|pt)$") String language,
-    @Size(min = 1, max = 64) String timezone) {}
+    @Size(min = 1, max = 64) String timezone,
+    @Pattern(regexp = "^(FSRS|SM2)$", message = "schedulerAlgorithm must be FSRS or SM2")
+        String schedulerAlgorithm) {}

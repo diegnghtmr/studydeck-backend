@@ -74,7 +74,7 @@ class StatsControllerTest {
   @Test
   void getUserStats_returns200WithExpectedFields() throws Exception {
     when(getUserStats.execute(any()))
-        .thenReturn(new UserStatsResult(5L, 10L, 3L, 7, 0.85, 50, 0.90, 10, "en", "UTC"));
+        .thenReturn(new UserStatsResult(5L, 10L, 3L, 7, 0.85, 50, 0.90, 10, "en", "UTC", null));
 
     mockMvc
         .perform(get("/v1/stats").with(jwt().jwt(j -> j.subject(OWNER_ID.toString()))))
@@ -99,7 +99,7 @@ class StatsControllerTest {
   @Test
   void getUserStats_withTzParam_returns200() throws Exception {
     when(getUserStats.execute(any()))
-        .thenReturn(new UserStatsResult(0L, 0L, 0L, 0, null, 40, 0.90, 10, "en", "UTC"));
+        .thenReturn(new UserStatsResult(0L, 0L, 0L, 0, null, 40, 0.90, 10, "en", "UTC", null));
 
     mockMvc
         .perform(
@@ -114,7 +114,7 @@ class StatsControllerTest {
   @Test
   void getUserStats_withInvalidTz_defaultsToUtc_returns200() throws Exception {
     when(getUserStats.execute(any()))
-        .thenReturn(new UserStatsResult(1L, 2L, 0L, 1, null, 40, 0.90, 10, "en", "UTC"));
+        .thenReturn(new UserStatsResult(1L, 2L, 0L, 1, null, 40, 0.90, 10, "en", "UTC", null));
 
     mockMvc
         .perform(
@@ -129,7 +129,8 @@ class StatsControllerTest {
   void getUserStats_includesPreferenceFields() throws Exception {
     when(getUserStats.execute(any()))
         .thenReturn(
-            new UserStatsResult(2L, 5L, 1L, 3, 0.78, 30, 0.85, 20, "es", "America/Sao_Paulo"));
+            new UserStatsResult(
+                2L, 5L, 1L, 3, 0.78, 30, 0.85, 20, "es", "America/Sao_Paulo", null));
 
     mockMvc
         .perform(get("/v1/stats").with(jwt().jwt(j -> j.subject(OWNER_ID.toString()))))

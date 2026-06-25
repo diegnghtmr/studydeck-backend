@@ -14,4 +14,5 @@ public record UserStatsResponse(
     double desiredRetention,
     int newCardsPerDay,
     String language,
-    String timezone) {}
+    String timezone,
+    String schedulerAlgorithm) {}

@@ -4,6 +4,7 @@ import com.studydeck.domain.model.OwnerId;
 import com.studydeck.domain.model.UserAccount;
 import com.studydeck.domain.port.out.UserAccountRepository;
 import java.util.Optional;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.transaction.annotation.Transactional;
 
 /**
@@ -31,7 +32,12 @@ class UserAccountPersistenceAdapter implements UserAccountRepository {
 
   @Override
   public void save(UserAccount userAccount) {
-    jpaRepo.save(mapper.toJpa(userAccount));
+    try {
+      jpaRepo.save(mapper.toJpa(userAccount));
+    } catch (DataIntegrityViolationException e) {
+      // Concurrent insert by another thread/node — treat as success (idempotent provision).
+      // The user_account row already exists; no further action needed.
+    }
   }
 
   @Override

@@ -111,9 +111,16 @@ public final class NoteService
 
     List<Note> content =
         noteRepository.findAll(
-            query.deckId(), query.noteType(), query.tag(), query.search(), offset, limit);
+            query.ownerId(),
+            query.deckId(),
+            query.noteType(),
+            query.tag(),
+            query.search(),
+            offset,
+            limit);
     long total =
-        noteRepository.countAll(query.deckId(), query.noteType(), query.tag(), query.search());
+        noteRepository.countAll(
+            query.ownerId(), query.deckId(), query.noteType(), query.tag(), query.search());
     return Page.of(content, page, limit, total);
   }
 

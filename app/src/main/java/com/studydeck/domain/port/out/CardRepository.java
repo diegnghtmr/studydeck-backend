@@ -4,6 +4,7 @@ import com.studydeck.domain.model.Card;
 import com.studydeck.domain.model.CardId;
 import com.studydeck.domain.model.DeckId;
 import com.studydeck.domain.model.NoteId;
+import com.studydeck.domain.model.OwnerId;
 import java.util.List;
 import java.util.Optional;
 
@@ -27,22 +28,24 @@ public interface CardRepository {
   List<Card> findByNoteId(NoteId noteId);
 
   /**
-   * Loads Cards with optional filters.
+   * Loads Cards with optional filters, scoped to the authenticated owner.
    *
-   * @param deckId optional deck filter; null means all decks
+   * @param ownerId the authenticated owner (non-null); results are restricted to this owner's decks
+   * @param deckId optional deck filter; null means all decks owned by ownerId
    * @param suspended optional suspended filter; null means all
    * @param offset page offset (0-based)
    * @param limit page size
    */
-  List<Card> findAll(DeckId deckId, Boolean suspended, int offset, int limit);
+  List<Card> findAll(OwnerId ownerId, DeckId deckId, Boolean suspended, int offset, int limit);
 
   /**
-   * Counts Cards matching the same filters.
+   * Counts Cards matching the same filters, scoped to the authenticated owner.
    *
-   * @param deckId optional deck filter; null means all decks
+   * @param ownerId the authenticated owner (non-null); results are restricted to this owner's decks
+   * @param deckId optional deck filter; null means all decks owned by ownerId
    * @param suspended optional suspended filter; null means all
    */
-  long countAll(DeckId deckId, Boolean suspended);
+  long countAll(OwnerId ownerId, DeckId deckId, Boolean suspended);
 
   /** Deletes all Cards derived from a Note. Used when a Note is deleted. */
   void deleteByNoteId(NoteId noteId);

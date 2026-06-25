@@ -1,10 +1,13 @@
 package com.studydeck.infrastructure.adapter.out.ai;
 
+import com.studydeck.domain.model.AiProviderConfig;
 import com.studydeck.domain.model.OwnerId;
 import com.studydeck.domain.port.out.AiChatPort;
 import java.util.List;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.model.ChatModel;
+import org.springframework.ai.openai.OpenAiChatModel;
+import org.springframework.ai.openai.OpenAiChatOptions;
 
 /**
  * Spring AI adapter implementing {@link AiChatPort}.
@@ -13,7 +16,9 @@ import org.springframework.ai.chat.model.ChatModel;
  * with a stub that returns {@code isAvailable() == false}. The application layer then returns a
  * typed 503 error instead of crashing.
  *
- * <p>Prompts are loaded from {@code classpath:/prompts/} following the "externalize prompts" rule.
+ * <p>When a per-request {@link AiProviderConfig} override is provided, a TRANSIENT {@link
+ * ChatClient} is built for that request only using the override's baseUrl, apiKey, and model. The
+ * global client is used otherwise. The apiKey is never logged.
  *
  * <p>This class lives in infrastructure — the only place allowed to import Spring AI types.
  */
@@ -37,15 +42,41 @@ public class SpringAiChatAdapter implements AiChatPort {
     return available;
   }
 
+  /**
+   * Returns the global {@link ChatClient}, or a per-request transient client when {@code override}
+   * is non-null.
+   *
+   * <p>Thread-safe: no shared mutable state; override-based clients are created per invocation.
+   */
+  private ChatClient clientFor(AiProviderConfig override) {
+    if (override == null) {
+      if (!available) throw new AiChatUnavailableException();
+      return chatClient;
+    }
+    // Build a TRANSIENT per-request ChatClient from the override. No shared state.
+    OpenAiChatOptions options =
+        OpenAiChatOptions.builder()
+            .baseUrl(override.baseUrl())
+            .apiKey(override.apiKey())
+            .model(override.model())
+            .build();
+    OpenAiChatModel overrideModel = OpenAiChatModel.builder().options(options).build();
+    return ChatClient.builder(overrideModel).build();
+  }
+
   @Override
-  public RagAnswer ragChat(String question, OwnerId ownerId, List<ContextChunk> contextChunks) {
-    if (!available) throw new AiChatUnavailableException();
+  public RagAnswer ragChat(
+      String question,
+      OwnerId ownerId,
+      List<ContextChunk> contextChunks,
+      AiProviderConfig override) {
+    ChatClient client = clientFor(override);
 
     // Build context block for the prompt
     var contextText = buildContextText(contextChunks);
 
     String answer =
-        chatClient
+        client
             .prompt()
             .system(
                 s ->
@@ -80,14 +111,18 @@ public class SpringAiChatAdapter implements AiChatPort {
 
   @Override
   public String generateFlashcardsRaw(
-      String sourceText, String deckContext, List<String> noteTypes, int maxCards) {
-    if (!available) throw new AiChatUnavailableException();
+      String sourceText,
+      String deckContext,
+      List<String> noteTypes,
+      int maxCards,
+      AiProviderConfig override) {
+    ChatClient client = clientFor(override);
 
     String noteTypeList = String.join(", ", noteTypes);
     String context =
         (deckContext != null && !deckContext.isBlank()) ? deckContext : "general study";
 
-    return chatClient
+    return client
         .prompt()
         .system(
             s ->

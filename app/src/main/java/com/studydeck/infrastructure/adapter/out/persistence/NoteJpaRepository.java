@@ -9,32 +9,52 @@ import org.springframework.data.repository.query.Param;
 /** Spring Data JPA repository for {@link NoteJpaEntity}. */
 interface NoteJpaRepository extends JpaRepository<NoteJpaEntity, UUID> {
 
+  /**
+   * Native query that filters notes by owner (via deck join), with optional deck/type/tag/search
+   * filters, PostgreSQL array-containment for tags, and explicit OFFSET/LIMIT pagination — all
+   * executed in a single database round-trip.
+   */
   @Query(
-      """
-      SELECT n FROM NoteJpaEntity n
-      WHERE (:deckId IS NULL OR n.deckId = :deckId)
-        AND (:noteType IS NULL OR n.noteType = :noteType)
-        AND (:search IS NULL OR :search = ''
-             OR cast(n.content as string) LIKE concat('%', :search, '%'))
-      ORDER BY n.createdAt ASC
-      """)
-  List<NoteJpaEntity> findWithFilters(
+      value =
+          """
+          SELECT n.* FROM note n
+          JOIN deck d ON d.id = n.deck_id
+          WHERE d.owner_id = :ownerId
+            AND (:deckId IS NULL OR n.deck_id = :deckId)
+            AND (:noteType IS NULL OR n.note_type = :noteType)
+            AND (:search IS NULL OR cast(n.content as text) LIKE concat('%', :search, '%'))
+            AND (:tag IS NULL OR n.tags @> ARRAY[:tag]::text[])
+          ORDER BY n.created_at ASC
+          LIMIT :lim OFFSET :off
+          """,
+      nativeQuery = true)
+  List<NoteJpaEntity> findWithFiltersNative(
+      @Param("ownerId") UUID ownerId,
       @Param("deckId") UUID deckId,
       @Param("noteType") String noteType,
-      @Param("search") String search);
+      @Param("search") String search,
+      @Param("tag") String tag,
+      @Param("off") int offset,
+      @Param("lim") int limit);
 
   @Query(
-      """
-      SELECT count(n) FROM NoteJpaEntity n
-      WHERE (:deckId IS NULL OR n.deckId = :deckId)
-        AND (:noteType IS NULL OR n.noteType = :noteType)
-        AND (:search IS NULL OR :search = ''
-             OR cast(n.content as string) LIKE concat('%', :search, '%'))
-      """)
-  long countWithFilters(
+      value =
+          """
+          SELECT count(*) FROM note n
+          JOIN deck d ON d.id = n.deck_id
+          WHERE d.owner_id = :ownerId
+            AND (:deckId IS NULL OR n.deck_id = :deckId)
+            AND (:noteType IS NULL OR n.note_type = :noteType)
+            AND (:search IS NULL OR cast(n.content as text) LIKE concat('%', :search, '%'))
+            AND (:tag IS NULL OR n.tags @> ARRAY[:tag]::text[])
+          """,
+      nativeQuery = true)
+  long countWithFiltersNative(
+      @Param("ownerId") UUID ownerId,
       @Param("deckId") UUID deckId,
       @Param("noteType") String noteType,
-      @Param("search") String search);
+      @Param("search") String search,
+      @Param("tag") String tag);
 
   void deleteByDeckId(UUID deckId);
 

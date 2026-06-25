@@ -2,6 +2,7 @@ package com.studydeck.infrastructure.adapter.in.web;
 
 import com.studydeck.application.common.Page;
 import com.studydeck.application.common.PageRequest;
+import com.studydeck.application.exception.NotFoundException;
 import com.studydeck.domain.model.Card;
 import com.studydeck.domain.model.CardId;
 import com.studydeck.domain.model.DeckId;
@@ -150,9 +151,11 @@ class CardController {
     try {
       Note note = getNote.execute(new GetNoteQuery.Query(ownerId, card.getNoteId()));
       return note.getDeckId().value();
-    } catch (Exception e) {
+    } catch (NotFoundException e) {
+      // Note or deck not found for this owner — return null so the card response omits deckId.
       return null;
     }
+    // All other exceptions propagate to the global handler (e.g., data corruption, DB errors).
   }
 
   private String extractText(com.studydeck.domain.model.CardPayload payload) {

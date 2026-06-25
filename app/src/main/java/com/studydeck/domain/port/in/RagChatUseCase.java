@@ -1,5 +1,6 @@
 package com.studydeck.domain.port.in;
 
+import com.studydeck.domain.model.AiProviderConfig;
 import com.studydeck.domain.model.DocumentId;
 import com.studydeck.domain.model.OwnerId;
 import com.studydeck.domain.port.out.AiChatPort.RagAnswer;
@@ -15,5 +16,10 @@ public interface RagChatUseCase {
 
   RagAnswer execute(Command command);
 
-  record Command(String message, OwnerId ownerId, List<DocumentId> documentIds, int topK) {}
+  record Command(
+      String message,
+      OwnerId ownerId,
+      List<DocumentId> documentIds,
+      int topK,
+      AiProviderConfig providerConfig) {}
 }

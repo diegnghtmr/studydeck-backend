@@ -41,9 +41,10 @@ class DeckPersistenceAdapter implements DeckRepository {
   public List<Deck> findByOwner(
       OwnerId ownerId, boolean includeArchived, String search, int offset, int limit) {
     String searchParam = (search == null || search.isBlank()) ? null : search;
-    return jpaRepo.findByOwner(ownerId.value(), includeArchived, searchParam).stream()
-        .skip(offset)
-        .limit(limit)
+    // Delegate OFFSET/LIMIT to the database — avoids loading all owner decks into JVM memory.
+    return jpaRepo
+        .findByOwner(ownerId.value(), includeArchived, searchParam, limit, offset)
+        .stream()
         .map(mapper::toDomain)
         .toList();
   }

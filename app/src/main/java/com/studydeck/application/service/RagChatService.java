@@ -48,6 +48,7 @@ public final class RagChatService implements RagChatUseCase {
             .toList();
 
     // 3. Delegate to chat port
-    return chatPort.ragChat(command.message(), command.ownerId(), context);
+    return chatPort.ragChat(
+        command.message(), command.ownerId(), context, command.providerConfig());
   }
 }

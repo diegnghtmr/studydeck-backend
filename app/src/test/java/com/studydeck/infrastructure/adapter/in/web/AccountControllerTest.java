@@ -7,6 +7,7 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -14,6 +15,8 @@ import com.studydeck.domain.model.OwnerId;
 import com.studydeck.domain.model.UserAccount;
 import com.studydeck.domain.port.in.DeleteAccountUseCase;
 import com.studydeck.domain.port.in.ExportAccountUseCase;
+import com.studydeck.domain.port.in.LogoutAllSessionsUseCase;
+import com.studydeck.domain.port.in.UpdateUserPreferencesUseCase;
 import com.studydeck.integration.AiTestConfiguration;
 import java.time.Instant;
 import java.util.List;
@@ -24,6 +27,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.annotation.Import;
+import org.springframework.http.MediaType;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
@@ -74,6 +78,14 @@ class AccountControllerTest {
   @MockitoBean
   @Qualifier("deleteAccountUseCase")
   DeleteAccountUseCase deleteAccount;
+
+  @MockitoBean
+  @Qualifier("updateUserPreferencesUseCase")
+  UpdateUserPreferencesUseCase updateUserPreferences;
+
+  @MockitoBean
+  @Qualifier("logoutAllSessionsUseCase")
+  LogoutAllSessionsUseCase logoutAllSessions;
 
   MockMvc mockMvc;
 
@@ -154,5 +166,158 @@ class AccountControllerTest {
   @Test
   void delete_withoutAuth_returns401() throws Exception {
     mockMvc.perform(delete("/v1/account")).andExpect(status().isUnauthorized());
+  }
+
+  // ---------------------------------------------------------------
+  // PATCH /v1/account/preferences
+  // ---------------------------------------------------------------
+
+  @Test
+  void patchPreferences_withNewFields_returns204() throws Exception {
+    doNothing().when(updateUserPreferences).execute(any());
+
+    mockMvc
+        .perform(
+            patch("/v1/account/preferences")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {
+                      "dailyGoal": 30,
+                      "desiredRetention": 0.85,
+                      "newCardsPerDay": 20,
+                      "language": "es",
+                      "timezone": "America/New_York"
+                    }
+                    """)
+                .with(
+                    jwt()
+                        .jwt(j -> j.subject(OWNER_ID.toString()))
+                        .authorities(new SimpleGrantedAuthority("SCOPE_study.write"))))
+        .andExpect(status().isNoContent());
+  }
+
+  @Test
+  void patchPreferences_partialPatch_onlyDailyGoal_returns204() throws Exception {
+    doNothing().when(updateUserPreferences).execute(any());
+
+    mockMvc
+        .perform(
+            patch("/v1/account/preferences")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"dailyGoal": 50}
+                    """)
+                .with(
+                    jwt()
+                        .jwt(j -> j.subject(OWNER_ID.toString()))
+                        .authorities(new SimpleGrantedAuthority("SCOPE_study.write"))))
+        .andExpect(status().isNoContent());
+  }
+
+  @Test
+  void patchPreferences_invalidLanguage_returns400() throws Exception {
+    mockMvc
+        .perform(
+            patch("/v1/account/preferences")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"language": "de"}
+                    """)
+                .with(
+                    jwt()
+                        .jwt(j -> j.subject(OWNER_ID.toString()))
+                        .authorities(new SimpleGrantedAuthority("SCOPE_study.write"))))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void patchPreferences_retentionOutOfRange_returns400() throws Exception {
+    mockMvc
+        .perform(
+            patch("/v1/account/preferences")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"desiredRetention": 1.0}
+                    """)
+                .with(
+                    jwt()
+                        .jwt(j -> j.subject(OWNER_ID.toString()))
+                        .authorities(new SimpleGrantedAuthority("SCOPE_study.write"))))
+        .andExpect(status().isBadRequest());
+  }
+
+  @Test
+  void patchPreferences_withoutAuth_returns401() throws Exception {
+    mockMvc
+        .perform(
+            patch("/v1/account/preferences")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"dailyGoal": 30}
+                    """))
+        .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void patchPreferences_withoutScope_returns403() throws Exception {
+    mockMvc
+        .perform(
+            patch("/v1/account/preferences")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"dailyGoal": 30}
+                    """)
+                .with(
+                    jwt()
+                        .jwt(j -> j.subject(OWNER_ID.toString()))
+                        .authorities(new SimpleGrantedAuthority("SCOPE_study.read"))))
+        .andExpect(status().isForbidden());
+  }
+
+  // ---------------------------------------------------------------
+  // POST /v1/account/logout-all
+  // ---------------------------------------------------------------
+
+  @Test
+  void logoutAll_withStudyWriteScope_returns204() throws Exception {
+    doNothing().when(logoutAllSessions).execute(any());
+
+    mockMvc
+        .perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
+                    "/v1/account/logout-all")
+                .with(
+                    jwt()
+                        .jwt(j -> j.subject(OWNER_ID.toString()))
+                        .authorities(new SimpleGrantedAuthority("SCOPE_study.write"))))
+        .andExpect(status().isNoContent());
+  }
+
+  @Test
+  void logoutAll_withoutStudyWriteScope_returns403() throws Exception {
+    mockMvc
+        .perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
+                    "/v1/account/logout-all")
+                .with(
+                    jwt()
+                        .jwt(j -> j.subject(OWNER_ID.toString()))
+                        .authorities(new SimpleGrantedAuthority("SCOPE_study.read"))))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void logoutAll_withoutAuth_returns401() throws Exception {
+    mockMvc
+        .perform(
+            org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
+                "/v1/account/logout-all"))
+        .andExpect(status().isUnauthorized());
   }
 }

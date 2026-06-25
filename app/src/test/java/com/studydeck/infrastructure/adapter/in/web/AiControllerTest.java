@@ -99,7 +99,7 @@ class AiControllerTest {
   @Test
   void generate_acceptsNestedContractRequest_andReturnsGeneratedShape() throws Exception {
     when(aiChatPort.isAvailable()).thenReturn(true);
-    when(aiChatPort.generateFlashcardsRaw(anyString(), any(), anyList(), anyInt()))
+    when(aiChatPort.generateFlashcardsRaw(anyString(), any(), anyList(), anyInt(), any()))
         .thenReturn(VALID_FLASHCARD_JSON);
     when(aiSchemaValidationPort.validateAndReturn(anyString()))
         .thenAnswer(inv -> inv.getArgument(0));

@@ -1,11 +1,13 @@
 package com.studydeck.infrastructure.adapter.in.web;
 
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.security.test.web.servlet.setup.SecurityMockMvcConfigurers.springSecurity;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.header;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -19,7 +21,9 @@ import com.studydeck.domain.port.in.ArchiveDeckUseCase;
 import com.studydeck.domain.port.in.CreateDeckUseCase;
 import com.studydeck.domain.port.in.DeleteDeckUseCase;
 import com.studydeck.domain.port.in.GetDeckQuery;
+import com.studydeck.domain.port.in.GetDeckStatsQuery;
 import com.studydeck.domain.port.in.ListDecksQuery;
+import com.studydeck.domain.port.in.UnarchiveDeckUseCase;
 import com.studydeck.domain.port.in.UpdateDeckUseCase;
 import com.studydeck.integration.AiTestConfiguration;
 import java.time.Instant;
@@ -99,8 +103,16 @@ class DeckControllerTest {
   ArchiveDeckUseCase archiveDeck;
 
   @MockitoBean
+  @Qualifier("unarchiveDeckUseCase")
+  UnarchiveDeckUseCase unarchiveDeck;
+
+  @MockitoBean
   @Qualifier("deleteDeckUseCase")
   DeleteDeckUseCase deleteDeck;
+
+  @MockitoBean
+  @Qualifier("getDeckStatsQuery")
+  GetDeckStatsQuery getDeckStats;
 
   MockMvc mockMvc;
 
@@ -200,5 +212,41 @@ class DeckControllerTest {
                 .content(body))
         .andExpect(status().isBadRequest())
         .andExpect(jsonPath("$.title").value("Validation Failed"));
+  }
+
+  @Test
+  void patchDeck_archivedFalse_callsUnarchiveAndReturns200() throws Exception {
+    // PATCH {archived: false} must call unarchiveDeck, NOT archiveDeck
+    when(getDeck.execute(any())).thenReturn(fakeDeck());
+
+    String body = objectMapper.writeValueAsString(Map.of("archived", false));
+
+    mockMvc
+        .perform(
+            patch("/v1/decks/{deckId}", DECK_ID)
+                .with(jwt().jwt(j -> j.subject(OWNER_ID.toString())))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isOk());
+
+    // Verify unarchiveDeck was called
+    verify(unarchiveDeck).execute(any(UnarchiveDeckUseCase.Command.class));
+  }
+
+  @Test
+  void patchDeck_archivedTrue_callsArchiveAndReturns200() throws Exception {
+    when(getDeck.execute(any())).thenReturn(fakeDeck());
+
+    String body = objectMapper.writeValueAsString(Map.of("archived", true));
+
+    mockMvc
+        .perform(
+            patch("/v1/decks/{deckId}", DECK_ID)
+                .with(jwt().jwt(j -> j.subject(OWNER_ID.toString())))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(body))
+        .andExpect(status().isOk());
+
+    verify(archiveDeck).execute(any(ArchiveDeckUseCase.Command.class));
   }
 }

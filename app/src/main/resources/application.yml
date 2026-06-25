@@ -112,6 +112,13 @@ studydeck:
     embedding:
       model-name: ${STUDYDECK_AI_EMBEDDING_MODEL:all-MiniLM-L6-v2}
       dimensions: ${STUDYDECK_AI_EMBEDDING_DIMS:384}
+  idp:
+    admin:
+      base-url: ${KEYCLOAK_ADMIN_BASE_URL:}
+      realm: ${KEYCLOAK_ADMIN_REALM:studydeck}
+      username: ${KEYCLOAK_ADMIN:}
+      password: ${KEYCLOAK_ADMIN_PASSWORD:}
+      client-id: ${KEYCLOAK_ADMIN_CLIENT_ID:admin-cli}
 
 server:
   port: 8080

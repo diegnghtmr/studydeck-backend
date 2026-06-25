@@ -4,6 +4,7 @@ import com.studydeck.domain.model.DeckId;
 import com.studydeck.domain.model.Note;
 import com.studydeck.domain.model.NoteId;
 import com.studydeck.domain.model.NoteType;
+import com.studydeck.domain.model.OwnerId;
 import com.studydeck.domain.port.out.NoteRepository;
 import java.util.List;
 import java.util.Optional;
@@ -35,36 +36,33 @@ class NotePersistenceAdapter implements NoteRepository {
   @Override
   @Transactional(readOnly = true)
   public List<Note> findAll(
-      DeckId deckId, NoteType noteType, String tag, String search, int offset, int limit) {
+      OwnerId ownerId,
+      DeckId deckId,
+      NoteType noteType,
+      String tag,
+      String search,
+      int offset,
+      int limit) {
+    var ownerUuid = ownerId.value();
     var deckUuid = (deckId != null) ? deckId.value() : null;
     var noteTypeName = (noteType != null) ? noteType.name() : null;
     String searchParam = (search == null || search.isBlank()) ? null : search;
-
-    List<NoteJpaEntity> entities = jpaRepo.findWithFilters(deckUuid, noteTypeName, searchParam);
-
-    // Tag filter applied in memory (text[] containment — could be pushed to DB via native query)
-    return entities.stream()
-        .filter(e -> tag == null || e.getTags().contains(tag))
-        .skip(offset)
-        .limit(limit)
+    return jpaRepo
+        .findWithFiltersNative(ownerUuid, deckUuid, noteTypeName, searchParam, tag, offset, limit)
+        .stream()
         .map(mapper::toDomain)
         .toList();
   }
 
   @Override
   @Transactional(readOnly = true)
-  public long countAll(DeckId deckId, NoteType noteType, String tag, String search) {
+  public long countAll(
+      OwnerId ownerId, DeckId deckId, NoteType noteType, String tag, String search) {
+    var ownerUuid = ownerId.value();
     var deckUuid = (deckId != null) ? deckId.value() : null;
     var noteTypeName = (noteType != null) ? noteType.name() : null;
     String searchParam = (search == null || search.isBlank()) ? null : search;
-
-    if (tag != null) {
-      // Need in-memory count when tag filter is active
-      return jpaRepo.findWithFilters(deckUuid, noteTypeName, searchParam).stream()
-          .filter(e -> e.getTags().contains(tag))
-          .count();
-    }
-    return jpaRepo.countWithFilters(deckUuid, noteTypeName, searchParam);
+    return jpaRepo.countWithFiltersNative(ownerUuid, deckUuid, noteTypeName, searchParam, tag);
   }
 
   @Override

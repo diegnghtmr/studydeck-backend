@@ -4,6 +4,7 @@ import com.studydeck.domain.model.Card;
 import com.studydeck.domain.model.CardId;
 import com.studydeck.domain.model.DeckId;
 import com.studydeck.domain.model.NoteId;
+import com.studydeck.domain.model.OwnerId;
 import com.studydeck.domain.port.out.CardRepository;
 import java.util.ArrayList;
 import java.util.List;
@@ -15,10 +16,11 @@ import java.util.function.Function;
 /**
  * In-memory test double for {@link CardRepository}.
  *
- * <p>Deck-level filtering requires knowing which deck a card belongs to. Because {@link Card} holds
- * a {@code noteId} (not a {@code deckId}), this stub accepts an optional {@code noteIdToDeckId}
- * resolver function injected from tests that need deck-level filtering. When not provided, deck
- * filtering is skipped (all cards pass the filter).
+ * <p>Deck-level and owner-level filtering require resolvers because {@link Card} holds a {@code
+ * noteId} (not a {@code deckId}). Inject {@code noteIdToDeckId} for deck filtering and {@code
+ * noteIdToOwnerId} for ownership filtering. When a resolver is not provided the corresponding
+ * filter is skipped (all cards pass), keeping backward-compatible behaviour for tests that do not
+ * need cross-tenant isolation.
  */
 public final class InMemoryCardRepository implements CardRepository {
 
@@ -30,8 +32,18 @@ public final class InMemoryCardRepository implements CardRepository {
    */
   private Function<NoteId, DeckId> noteIdToDeckId = noteId -> null;
 
+  /**
+   * Optional resolver: given a NoteId returns the OwnerId of the deck that owns it. Used for
+   * owner-based filtering in findAll / countAll.
+   */
+  private Function<NoteId, OwnerId> noteIdToOwnerId = noteId -> null;
+
   public void setNoteIdToDeckId(Function<NoteId, DeckId> resolver) {
     this.noteIdToDeckId = resolver;
+  }
+
+  public void setNoteIdToOwnerId(Function<NoteId, OwnerId> resolver) {
+    this.noteIdToOwnerId = resolver;
   }
 
   @Override
@@ -58,8 +70,10 @@ public final class InMemoryCardRepository implements CardRepository {
   }
 
   @Override
-  public List<Card> findAll(DeckId deckId, Boolean suspended, int offset, int limit) {
+  public List<Card> findAll(
+      OwnerId ownerId, DeckId deckId, Boolean suspended, int offset, int limit) {
     return store.values().stream()
+        .filter(c -> matchesOwner(c, ownerId))
         .filter(c -> deckId == null || deckId.equals(noteIdToDeckId.apply(c.getNoteId())))
         .filter(c -> suspended == null || c.isSuspended() == suspended)
         .sorted(
@@ -71,8 +85,9 @@ public final class InMemoryCardRepository implements CardRepository {
   }
 
   @Override
-  public long countAll(DeckId deckId, Boolean suspended) {
+  public long countAll(OwnerId ownerId, DeckId deckId, Boolean suspended) {
     return store.values().stream()
+        .filter(c -> matchesOwner(c, ownerId))
         .filter(c -> deckId == null || deckId.equals(noteIdToDeckId.apply(c.getNoteId())))
         .filter(c -> suspended == null || c.isSuspended() == suspended)
         .count();
@@ -100,5 +115,20 @@ public final class InMemoryCardRepository implements CardRepository {
 
   public List<Card> all() {
     return new ArrayList<>(store.values());
+  }
+
+  // --- Private helpers ---
+
+  private boolean matchesOwner(Card card, OwnerId ownerId) {
+    if (ownerId == null) {
+      return true;
+    }
+    OwnerId resolved = noteIdToOwnerId.apply(card.getNoteId());
+    // When no resolver is configured (resolved == null), let the card pass
+    // so existing tests that don't set up owner resolution still work.
+    if (resolved == null) {
+      return true;
+    }
+    return resolved.equals(ownerId);
   }
 }

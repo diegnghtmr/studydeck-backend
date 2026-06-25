@@ -52,7 +52,11 @@ class StatsController {
             stats.reviewedToday(),
             stats.dayStreak(),
             stats.retention30d(),
-            stats.dailyGoal());
+            stats.dailyGoal(),
+            stats.desiredRetention(),
+            stats.newCardsPerDay(),
+            stats.language(),
+            stats.timezone());
     return ResponseEntity.ok(response);
   }
 

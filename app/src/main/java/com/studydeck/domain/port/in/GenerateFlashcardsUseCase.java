@@ -1,5 +1,6 @@
 package com.studydeck.domain.port.in;
 
+import com.studydeck.domain.model.AiProviderConfig;
 import com.studydeck.domain.model.OwnerId;
 import java.util.List;
 
@@ -19,7 +20,8 @@ public interface GenerateFlashcardsUseCase {
       String sourceText,
       String deckContext,
       List<String> noteTypes,
-      int maxCards) {}
+      int maxCards,
+      AiProviderConfig providerConfig) {}
 
   /**
    * @param proposalsJson validated FlashcardImportV1-compatible JSON string

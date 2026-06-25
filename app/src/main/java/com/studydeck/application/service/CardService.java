@@ -53,22 +53,13 @@ public final class CardService
     int limit = query.pageRequest().size();
     int page = query.pageRequest().page();
 
-    // For deck-level filtering we pass deckId; null means all decks.
-    // The repository is responsible for resolving note→deck join.
-    List<Card> content = cardRepository.findAll(query.deckId(), query.suspended(), offset, limit);
-    long total = cardRepository.countAll(query.deckId(), query.suspended());
+    // Ownership is enforced in the repository query (SQL join card -> note -> deck).
+    // No in-memory post-filtering is needed or permitted.
+    List<Card> content =
+        cardRepository.findAll(query.ownerId(), query.deckId(), query.suspended(), offset, limit);
+    long total = cardRepository.countAll(query.ownerId(), query.deckId(), query.suspended());
 
-    // Filter to only cards the caller owns (via their note's deck)
-    // When deckId is null we need to restrict to caller's decks.
-    // We do a post-filter here at the application level for the in-memory case;
-    // the JPA adapter will build the SQL join natively in B3.
-    List<Card> owned = content.stream().filter(c -> isOwnedBy(c, query.ownerId())).toList();
-
-    // Recount when we filtered (only relevant when deckId is null)
-    long ownedTotal =
-        query.deckId() == null ? countOwnedCards(query.ownerId(), query.suspended()) : total;
-
-    return Page.of(owned, page, limit, ownedTotal);
+    return Page.of(content, page, limit, total);
   }
 
   // ---------------------------------------------------------------
@@ -134,12 +125,5 @@ public final class CardService
       return false;
     }
     return deck.getOwnerId().equals(ownerId);
-  }
-
-  private long countOwnedCards(OwnerId ownerId, Boolean suspended) {
-    // Full scan of all cards then filter — acceptable for in-memory/tests;
-    // JPA adapter will implement with a proper join query in B3.
-    List<Card> all = cardRepository.findAll(null, suspended, 0, Integer.MAX_VALUE);
-    return all.stream().filter(c -> isOwnedBy(c, ownerId)).count();
   }
 }

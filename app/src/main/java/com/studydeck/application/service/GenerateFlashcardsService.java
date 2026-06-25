@@ -40,7 +40,8 @@ public final class GenerateFlashcardsService implements GenerateFlashcardsUseCas
             command.sourceText(),
             command.deckContext(),
             noteTypes,
-            Math.max(1, command.maxCards()));
+            Math.max(1, command.maxCards()),
+            command.providerConfig());
 
     // MANDATORY: validate the LLM output against FlashcardImportV1 JSON Schema.
     String validatedJson = schemaValidator.validateAndReturn(rawJson);

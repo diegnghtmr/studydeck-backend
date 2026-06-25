@@ -14,6 +14,8 @@ import com.studydeck.domain.port.out.UserAccountRepository;
  * ambiguous by type).
  *
  * <p>Framework-free: no Spring annotations. Wired as {@code @Bean} in {@code BeanConfiguration}.
+ *
+ * <p>Partial-update semantics: only non-null fields in the command are applied to the account.
  */
 public final class UserPreferencesService implements UpdateUserPreferencesUseCase {
 
@@ -32,7 +34,23 @@ public final class UserPreferencesService implements UpdateUserPreferencesUseCas
         userAccountRepository
             .findById(command.ownerId())
             .orElseThrow(() -> new NotFoundException("UserAccount", command.ownerId().toString()));
-    account.updateDailyGoal(command.dailyGoal());
+
+    if (command.dailyGoal() != null) {
+      account.updateDailyGoal(command.dailyGoal());
+    }
+    if (command.desiredRetention() != null) {
+      account.updateDesiredRetention(command.desiredRetention());
+    }
+    if (command.newCardsPerDay() != null) {
+      account.updateNewCardsPerDay(command.newCardsPerDay());
+    }
+    if (command.language() != null) {
+      account.updateLanguage(command.language());
+    }
+    if (command.timezone() != null) {
+      account.updateTimezone(command.timezone());
+    }
+
     userAccountRepository.save(account);
     auditEventPort.record(
         command.ownerId(), "user.preferences.updated", "UserAccount", command.ownerId().toString());

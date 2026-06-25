@@ -124,6 +124,15 @@ public final class ImportExportService
     int predictedCards = 0;
 
     if (command.targetDeckId() != null) {
+      // Ownership check — same guard as ExecuteImport to prevent hash-oracle IDOR.
+      Deck targetDeck =
+          deckRepository
+              .findById(command.targetDeckId())
+              .orElseThrow(() -> new NotFoundException("Deck", command.targetDeckId().toString()));
+      if (!targetDeck.getOwnerId().equals(command.ownerId())) {
+        throw new NotFoundException("Deck", command.targetDeckId().toString());
+      }
+
       for (NoteImport noteImport : payload.notes()) {
         NoteType noteType = noteTypeOf(noteImport.noteType());
         if (noteType == null) continue;
@@ -310,8 +319,9 @@ public final class ImportExportService
       throw new NotFoundException("Deck", deckId.toString());
     }
 
-    // Load all notes for this deck
-    List<Note> notes = noteRepository.findAll(deckId, null, null, null, 0, Integer.MAX_VALUE);
+    // Load all notes for this deck (owner-scoped)
+    List<Note> notes =
+        noteRepository.findAll(ownerId, deckId, null, null, null, 0, Integer.MAX_VALUE);
 
     List<NoteImport> noteImports = notes.stream().map(this::toNoteImport).toList();
 

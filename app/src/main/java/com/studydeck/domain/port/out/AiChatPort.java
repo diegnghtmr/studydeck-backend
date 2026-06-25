@@ -1,5 +1,6 @@
 package com.studydeck.domain.port.out;
 
+import com.studydeck.domain.model.AiProviderConfig;
 import com.studydeck.domain.model.OwnerId;
 import java.util.List;
 
@@ -28,9 +29,14 @@ public interface AiChatPort {
    * @param question the user's question
    * @param ownerId owner scope for RAG retrieval
    * @param contextChunks pre-retrieved relevant chunks (already filtered by ownerId)
+   * @param override per-request AI provider configuration (BYOK); {@code null} = use global
    * @return the answer text and cited source chunk IDs
    */
-  RagAnswer ragChat(String question, OwnerId ownerId, List<ContextChunk> contextChunks);
+  RagAnswer ragChat(
+      String question,
+      OwnerId ownerId,
+      List<ContextChunk> contextChunks,
+      AiProviderConfig override);
 
   /**
    * Generates flashcard proposals from the given source text.
@@ -39,10 +45,15 @@ public interface AiChatPort {
    * @param deckContext optional context about the target deck (title, topic)
    * @param noteTypes desired note types (e.g. ["basic", "cloze"])
    * @param maxCards maximum number of cards to generate
+   * @param override per-request AI provider configuration (BYOK); {@code null} = use global
    * @return raw structured output JSON — caller MUST validate against FlashcardImportV1 schema
    */
   String generateFlashcardsRaw(
-      String sourceText, String deckContext, List<String> noteTypes, int maxCards);
+      String sourceText,
+      String deckContext,
+      List<String> noteTypes,
+      int maxCards,
+      AiProviderConfig override);
 
   /**
    * Improves an existing flashcard.

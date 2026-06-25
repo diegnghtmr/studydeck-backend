@@ -61,9 +61,11 @@ public interface AiChatPort {
    * @param noteType the note type (basic, cloze, etc.)
    * @param currentContent JSON representation of the current card content
    * @param instruction improvement instruction from the user
+   * @param override per-request AI provider configuration (BYOK); {@code null} = use global
    * @return raw improved card content JSON — caller MUST validate against FlashcardImportV1 schema
    */
-  String improveFlashcardRaw(String noteType, String currentContent, String instruction);
+  String improveFlashcardRaw(
+      String noteType, String currentContent, String instruction, AiProviderConfig override);
 
   // ---------------------------------------------------------------
   // Value types

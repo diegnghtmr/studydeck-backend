@@ -129,21 +129,31 @@ public class SpringAiChatAdapter implements AiChatPort {
                 s.text(
                     """
                     You are a flashcard generation expert. Generate study flashcards from the provided \
-                    source text in valid JSON matching the FlashcardImportV1 schema exactly.
+                    source text as a SINGLE JSON object matching the FlashcardImportV1 schema EXACTLY.
 
-                    FlashcardImportV1 schema:
+                    Top-level shape:
                     {
                       "schemaVersion": "1.0",
-                      "deck": {"title": "<string>"},
-                      "notes": [<array of note objects>]
+                      "deck": {"title": "<deck title>"},
+                      "notes": [ <one or more note objects> ]
                     }
 
-                    Note types you can use: basic (requires front+back), cloze (requires text with \
-                    {{c1::deletion}} markers), reversed (requires front+back), multiple-choice \
-                    (requires question, options array with key+text, correctOptionKeys array), \
-                    free-text (requires prompt+expectedAnswer).
+                    Every note object MUST include a "noteType" field (exactly that key) whose value \
+                    is one of: "basic", "reversed", "cloze", "multiple-choice", "free-text". \
+                    Do NOT use a "type" field. Do NOT add any properties beyond those listed below.
 
-                    Return ONLY valid JSON. No explanations, no markdown code blocks.
+                    Exact shape per note type:
+                    - basic:           {"noteType": "basic", "front": "<question>", "back": "<answer>"}
+                    - reversed:        {"noteType": "reversed", "front": "<term>", "back": "<definition>"}
+                    - cloze:           {"noteType": "cloze", "text": "<sentence with {{c1::hidden}} markers>"}
+                    - multiple-choice: {"noteType": "multiple-choice", "question": "<q>", "options": [{"key": "A", "text": "..."}, {"key": "B", "text": "..."}, {"key": "C", "text": "..."}, {"key": "D", "text": "..."}], "correctOptionKeys": ["A"]}
+                    - free-text:       {"noteType": "free-text", "prompt": "<q>", "expectedAnswer": "<a>"}
+
+                    Rules:
+                    - multiple-choice requires 4 or 5 options with uppercase keys A, B, C, D (optionally E) \
+                    and exactly one entry in correctOptionKeys.
+                    - cloze "text" MUST contain at least one {{c1::...}} marker.
+                    - Return ONLY the raw JSON object. No explanations, no markdown, no code fences.
                     """))
         .user(
             u ->
@@ -165,10 +175,11 @@ public class SpringAiChatAdapter implements AiChatPort {
   }
 
   @Override
-  public String improveFlashcardRaw(String noteType, String currentContent, String instruction) {
-    if (!available) throw new AiChatUnavailableException();
+  public String improveFlashcardRaw(
+      String noteType, String currentContent, String instruction, AiProviderConfig override) {
+    ChatClient client = clientFor(override);
 
-    return chatClient
+    return client
         .prompt()
         .system(
             s ->

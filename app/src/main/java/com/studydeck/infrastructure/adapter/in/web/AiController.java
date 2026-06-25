@@ -122,13 +122,28 @@ class AiController {
       throw new IllegalArgumentException("noteType and content are required");
     }
     try {
+      AiProviderConfig providerConfig = null;
+      if (request.providerOverride() != null) {
+        var dto = request.providerOverride();
+        if (dto.baseUrl() == null
+            || dto.baseUrl().isBlank()
+            || dto.apiKey() == null
+            || dto.apiKey().isBlank()
+            || dto.model() == null
+            || dto.model().isBlank()) {
+          throw new IllegalArgumentException(
+              "providerOverride requires all fields: baseUrl, apiKey, model");
+        }
+        providerConfig = new AiProviderConfig(dto.baseUrl(), dto.apiKey(), dto.model());
+      }
       String contentJson = objectMapper.writeValueAsString(request.content());
       var cmd =
           new ImproveFlashcardUseCase.Command(
               ownerId,
               request.noteType(),
               contentJson,
-              instructionFrom(request.objective(), request.preserveMeaning()));
+              instructionFrom(request.objective(), request.preserveMeaning()),
+              providerConfig);
       var result = improveFlashcard.execute(cmd);
 
       JsonNode improvedNode = objectMapper.readTree(result.improvedJson());
@@ -236,7 +251,11 @@ class AiController {
 
   /** Matches the openapi {@code ImproveFlashcardRequest} schema. */
   record ImproveFlashcardRequestDto(
-      String noteType, Map<String, Object> content, String objective, Boolean preserveMeaning) {}
+      String noteType,
+      Map<String, Object> content,
+      String objective,
+      Boolean preserveMeaning,
+      AiProviderConfigDto providerOverride) {}
 
   /** Per-request AI provider config for BYOK (Bring Your Own Key) support. */
   record AiProviderConfigDto(String baseUrl, String apiKey, String model) {}

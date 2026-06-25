@@ -1,8 +1,6 @@
 package com.studydeck.application.service;
 
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyInt;
-import static org.mockito.ArgumentMatchers.anyList;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
@@ -12,36 +10,33 @@ import static org.mockito.Mockito.when;
 
 import com.studydeck.domain.model.AiProviderConfig;
 import com.studydeck.domain.model.OwnerId;
-import com.studydeck.domain.port.in.GenerateFlashcardsUseCase;
+import com.studydeck.domain.port.in.ImproveFlashcardUseCase;
 import com.studydeck.domain.port.out.AiChatPort;
 import com.studydeck.domain.port.out.AiSchemaValidationPort;
-import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 
-class GenerateFlashcardsServiceProviderConfigTest {
+class ImproveFlashcardServiceProviderConfigTest {
 
   private AiChatPort chatPort;
   private AiSchemaValidationPort schemaValidator;
-  private GenerateFlashcardsService service;
+  private ImproveFlashcardService service;
   private final OwnerId ownerId = OwnerId.generate();
 
-  private static final String VALID_JSON =
-      """
-      {"schemaVersion":"1.0","deck":{"title":"T"},"notes":[{"noteType":"basic","front":"Q","back":"A"}]}
-      """;
+  private static final String IMPROVED_JSON = "{\"front\": \"Better Q?\", \"back\": \"Better A.\"}";
 
   @BeforeEach
   void setUp() {
     chatPort = mock(AiChatPort.class);
     schemaValidator = mock(AiSchemaValidationPort.class);
-    service = new GenerateFlashcardsService(chatPort, schemaValidator);
+    service = new ImproveFlashcardService(chatPort, schemaValidator);
     when(chatPort.isAvailable()).thenReturn(true);
-    when(chatPort.generateFlashcardsRaw(anyString(), any(), anyList(), anyInt(), any()))
-        .thenReturn(VALID_JSON);
-    when(schemaValidator.validateAndReturn(anyString())).thenAnswer(inv -> inv.getArgument(0));
+    when(chatPort.improveFlashcardRaw(anyString(), anyString(), anyString(), any()))
+        .thenReturn(IMPROVED_JSON);
+    when(schemaValidator.validateNoteAndReturn(anyString(), anyString()))
+        .thenAnswer(inv -> inv.getArgument(1));
   }
 
   @Nested
@@ -53,23 +48,24 @@ class GenerateFlashcardsServiceProviderConfigTest {
     void providerConfigIsForwarded() {
       var config = new AiProviderConfig("https://api.groq.com/v1", "sk-groq-key", "llama3-70b");
       var cmd =
-          new GenerateFlashcardsUseCase.Command(
-              ownerId, "source", null, List.of("basic"), 5, config);
+          new ImproveFlashcardUseCase.Command(
+              ownerId, "basic", "{\"front\":\"Q?\",\"back\":\"A.\"}", "Make it clearer", config);
 
       service.execute(cmd);
 
-      verify(chatPort).generateFlashcardsRaw(anyString(), any(), anyList(), anyInt(), eq(config));
+      verify(chatPort).improveFlashcardRaw(anyString(), anyString(), anyString(), eq(config));
     }
 
     @Test
     @DisplayName("when providerConfig is null on Command, port is called with null")
     void nullProviderConfigForwarded() {
       var cmd =
-          new GenerateFlashcardsUseCase.Command(ownerId, "source", null, List.of("basic"), 5, null);
+          new ImproveFlashcardUseCase.Command(
+              ownerId, "basic", "{\"front\":\"Q?\",\"back\":\"A.\"}", "Make it clearer", null);
 
       service.execute(cmd);
 
-      verify(chatPort).generateFlashcardsRaw(anyString(), any(), anyList(), anyInt(), isNull());
+      verify(chatPort).improveFlashcardRaw(anyString(), anyString(), anyString(), isNull());
     }
 
     @Test
@@ -82,12 +78,12 @@ class GenerateFlashcardsServiceProviderConfigTest {
           new AiProviderConfig(
               "https://api.groq.com/openai/v1", "sk-groq-key", "llama-3.3-70b-versatile");
       var cmd =
-          new GenerateFlashcardsUseCase.Command(
-              ownerId, "source", null, List.of("basic"), 5, config);
+          new ImproveFlashcardUseCase.Command(
+              ownerId, "basic", "{\"front\":\"Q?\",\"back\":\"A.\"}", "Make it clearer", config);
 
       service.execute(cmd);
 
-      verify(chatPort).generateFlashcardsRaw(anyString(), any(), anyList(), anyInt(), eq(config));
+      verify(chatPort).improveFlashcardRaw(anyString(), anyString(), anyString(), eq(config));
     }
 
     @Test
@@ -95,7 +91,8 @@ class GenerateFlashcardsServiceProviderConfigTest {
     void nullProviderConfigWithoutGlobalThrows() {
       when(chatPort.isAvailable()).thenReturn(false);
       var cmd =
-          new GenerateFlashcardsUseCase.Command(ownerId, "source", null, List.of("basic"), 5, null);
+          new ImproveFlashcardUseCase.Command(
+              ownerId, "basic", "{\"front\":\"Q?\",\"back\":\"A.\"}", "Make it clearer", null);
 
       org.junit.jupiter.api.Assertions.assertThrows(
           AiChatPort.AiChatUnavailableException.class, () -> service.execute(cmd));

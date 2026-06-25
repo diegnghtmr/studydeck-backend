@@ -12,6 +12,7 @@ import com.studydeck.application.support.InMemoryDeckRepository;
 import com.studydeck.application.support.InMemoryNoteRepository;
 import com.studydeck.application.support.InMemoryReviewLogRepository;
 import com.studydeck.application.support.InMemoryReviewSessionRepository;
+import com.studydeck.application.support.InMemoryUserAccountRepository;
 import com.studydeck.domain.model.Card;
 import com.studydeck.domain.model.CardId;
 import com.studydeck.domain.model.CardPayload;
@@ -26,11 +27,14 @@ import com.studydeck.domain.model.NoteType;
 import com.studydeck.domain.model.OwnerId;
 import com.studydeck.domain.model.ReviewLog;
 import com.studydeck.domain.model.ReviewRating;
+import com.studydeck.domain.model.UserAccount;
+import com.studydeck.domain.model.UserAccountStatus;
 import com.studydeck.domain.port.in.GetDeckStatsQuery;
 import com.studydeck.domain.port.in.ListDueCardsQuery;
 import com.studydeck.domain.port.in.StartReviewSessionUseCase;
 import com.studydeck.domain.port.in.SubmitReviewUseCase;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
@@ -53,6 +57,7 @@ class ReviewServiceTest {
   private InMemoryReviewSessionRepository sessionRepo;
   private InMemoryAuditEventPort auditPort;
   private FixedClockPort clock;
+  private InMemoryUserAccountRepository userAccountRepo;
 
   private ReviewService sut;
 
@@ -71,10 +76,19 @@ class ReviewServiceTest {
     sessionRepo = new InMemoryReviewSessionRepository();
     auditPort = new InMemoryAuditEventPort();
     clock = FixedClockPort.epoch();
+    userAccountRepo = new InMemoryUserAccountRepository();
 
     sut =
         new ReviewService(
-            deckRepo, noteRepo, cardRepo, scheduleRepo, logRepo, sessionRepo, auditPort, clock);
+            deckRepo,
+            noteRepo,
+            cardRepo,
+            scheduleRepo,
+            logRepo,
+            sessionRepo,
+            auditPort,
+            clock,
+            userAccountRepo);
 
     // Seed deck + note + card
     aliceDeck = DeckId.generate();
@@ -272,6 +286,48 @@ class ReviewServiceTest {
       assertThatThrownBy(() -> sut.execute(new GetDeckStatsQuery.Query(bob, aliceDeck)))
           .isInstanceOf(NotFoundException.class);
     }
+
+    @Test
+    @DisplayName("reviewedToday uses supplied timezone, not UTC")
+    void reviewedTodayUsesSuppliedTimezone() {
+      // Clock is fixed at 2000-01-01T00:30:00Z (30 min after UTC midnight).
+      // In UTC+14 (Line Islands), that instant is already 2000-01-01T14:30:00+14:00 — same day.
+      // In UTC-5, that instant is 1999-12-31T19:30:00-05:00 — previous day.
+      // A review logged at 1999-12-31T23:30:00Z (1 hour before the clock instant) falls:
+      //   - In UTC+14: 2000-01-01T13:30+14 → same day as today → reviewedToday=1
+      //   - In UTC-5:  1999-12-31T18:30-05 → previous day → reviewedToday=0
+      //   - In UTC:    1999-12-31T23:30Z → previous day (UTC midnight boundary) → reviewedToday=0
+
+      Instant clockInstant = Instant.parse("2000-01-01T00:30:00Z");
+      clock.setFixedInstant(clockInstant);
+
+      // Log a review at 1999-12-31T23:30:00Z (1 hour before clock)
+      Instant reviewAt = Instant.parse("1999-12-31T23:30:00Z");
+      scheduleRepo.save(alice, aliceCard, CardScheduleState.newFsrsCard(clockInstant));
+      logRepo.save(
+          alice,
+          null,
+          new com.studydeck.domain.model.ReviewLog(
+              aliceCard,
+              com.studydeck.domain.model.ReviewRating.GOOD,
+              com.studydeck.domain.model.CardState.NEW,
+              reviewAt,
+              0,
+              1,
+              null));
+
+      // UTC: reviewAt falls on 1999-12-31, clock on 2000-01-01 → different day → 0
+      GetDeckStatsQuery.DeckStatsResult utcStats =
+          sut.execute(new GetDeckStatsQuery.Query(alice, aliceDeck, ZoneId.of("UTC")));
+      assertThat(utcStats.reviewedToday()).isEqualTo(0);
+
+      // UTC-5: reviewAt is 1999-12-31T18:30-05, today is 1999-12-31T19:30-05
+      // → same local day → reviewedToday should be 1
+      GetDeckStatsQuery.DeckStatsResult minus5Stats =
+          sut.execute(new GetDeckStatsQuery.Query(alice, aliceDeck, ZoneId.of("America/New_York")));
+      // Note: America/New_York is UTC-5 in winter. Both reviewAt and clockInstant land on same day.
+      assertThat(minus5Stats.reviewedToday()).isEqualTo(1);
+    }
   }
 
   // ---------------------------------------------------------------
@@ -297,6 +353,107 @@ class ReviewServiceTest {
       assertThatThrownBy(
               () -> sut.execute(new StartReviewSessionUseCase.Command(alice, aliceDeck, 0)))
           .isInstanceOf(IllegalArgumentException.class);
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // PresetResolution — desiredRetention wiring
+  // ---------------------------------------------------------------
+
+  @Nested
+  @DisplayName("PresetResolution — desiredRetention wiring")
+  class PresetResolutionTests {
+
+    @Test
+    @DisplayName(
+        "FSRS preset uses user's desiredRetention — different retention yields different schedule")
+    void fsrsPresetUsesUserDesiredRetention() {
+      OwnerId userA = OwnerId.generate();
+      OwnerId userB = OwnerId.generate();
+
+      UserAccount accountA =
+          UserAccount.reconstitute(
+              userA,
+              "a@test.com",
+              "A",
+              UserAccountStatus.ACTIVE,
+              40,
+              0.85,
+              10,
+              "en",
+              "UTC",
+              Instant.EPOCH,
+              Instant.EPOCH);
+      userAccountRepo.save(accountA);
+
+      UserAccount accountB =
+          UserAccount.reconstitute(
+              userB,
+              "b@test.com",
+              "B",
+              UserAccountStatus.ACTIVE,
+              40,
+              0.90,
+              10,
+              "en",
+              "UTC",
+              Instant.EPOCH,
+              Instant.EPOCH);
+      userAccountRepo.save(accountB);
+
+      DeckId deckA = DeckId.generate();
+      deckRepo.save(Deck.create(deckA, userA, "Deck A", null));
+      NoteId noteA = NoteId.generate();
+      noteRepo.save(Note.create(noteA, deckA, new NoteContent.Basic("Q", "A"), null));
+      CardId cardA = CardId.generate();
+      cardRepo.save(
+          Card.create(
+              cardA,
+              noteA,
+              NoteType.BASIC,
+              "forward",
+              0,
+              new CardPayload.BasicPrompt("Q"),
+              new CardPayload.BasicAnswer("A")));
+      scheduleRepo.save(userA, cardA, CardScheduleState.newFsrsCard(clock.now()));
+
+      DeckId deckB = DeckId.generate();
+      deckRepo.save(Deck.create(deckB, userB, "Deck B", null));
+      NoteId noteB = NoteId.generate();
+      noteRepo.save(Note.create(noteB, deckB, new NoteContent.Basic("Q", "A"), null));
+      CardId cardB = CardId.generate();
+      cardRepo.save(
+          Card.create(
+              cardB,
+              noteB,
+              NoteType.BASIC,
+              "forward",
+              0,
+              new CardPayload.BasicPrompt("Q"),
+              new CardPayload.BasicAnswer("A")));
+      scheduleRepo.save(userB, cardB, CardScheduleState.newFsrsCard(clock.now()));
+
+      // EASY on a NEW card goes directly to REVIEW via nextInterval(s0, desiredRetention),
+      // so different desiredRetention values produce different scheduledDays.
+      SubmitReviewUseCase.Result resultA =
+          sut.execute(new SubmitReviewUseCase.Command(userA, cardA, ReviewRating.EASY, null, null));
+      SubmitReviewUseCase.Result resultB =
+          sut.execute(new SubmitReviewUseCase.Command(userB, cardB, ReviewRating.EASY, null, null));
+
+      assertThat(resultA.reviewResult().nextState().scheduledDays())
+          .isNotEqualTo(resultB.reviewResult().nextState().scheduledDays());
+    }
+
+    @Test
+    @DisplayName("FSRS preset falls back to 0.90 when user not found in repository")
+    void fsrsPresetFallsBackWhenUserAbsent() {
+      scheduleRepo.save(alice, aliceCard, CardScheduleState.newFsrsCard(clock.now()));
+
+      SubmitReviewUseCase.Command command =
+          new SubmitReviewUseCase.Command(alice, aliceCard, ReviewRating.GOOD, null, null);
+
+      SubmitReviewUseCase.Result result = sut.execute(command);
+      assertThat(result.reviewResult().nextState().scheduledDays()).isGreaterThan(0);
     }
   }
 }

@@ -14,6 +14,7 @@ import com.studydeck.domain.model.ReviewLog;
 import com.studydeck.domain.model.ReviewResult;
 import com.studydeck.domain.model.SchedulerAlgorithm;
 import com.studydeck.domain.model.SchedulerPreset;
+import com.studydeck.domain.model.UserAccount;
 import com.studydeck.domain.port.in.GetDeckStatsQuery;
 import com.studydeck.domain.port.in.GetNextCardQuery;
 import com.studydeck.domain.port.in.GetReviewSessionQuery;
@@ -30,12 +31,14 @@ import com.studydeck.domain.port.out.NoteRepository;
 import com.studydeck.domain.port.out.ReviewLogRepository;
 import com.studydeck.domain.port.out.ReviewSessionRepository;
 import com.studydeck.domain.port.out.ReviewSessionRepository.ReviewSessionView;
+import com.studydeck.domain.port.out.UserAccountRepository;
 import com.studydeck.domain.service.FsrsScheduler;
 import com.studydeck.domain.service.SchedulingEngine;
 import com.studydeck.domain.service.Sm2Scheduler;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.temporal.ChronoUnit;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -68,6 +71,7 @@ public final class ReviewService
   private final ReviewSessionRepository sessionRepository;
   private final AuditEventPort auditPort;
   private final ClockPort clockPort;
+  private final UserAccountRepository userAccountRepository;
 
   private final FsrsScheduler fsrsScheduler;
   private final Sm2Scheduler sm2Scheduler;
@@ -80,7 +84,8 @@ public final class ReviewService
       ReviewLogRepository reviewLogRepository,
       ReviewSessionRepository sessionRepository,
       AuditEventPort auditPort,
-      ClockPort clockPort) {
+      ClockPort clockPort,
+      UserAccountRepository userAccountRepository) {
     this.deckRepository = deckRepository;
     this.noteRepository = noteRepository;
     this.cardRepository = cardRepository;
@@ -89,6 +94,7 @@ public final class ReviewService
     this.sessionRepository = sessionRepository;
     this.auditPort = auditPort;
     this.clockPort = clockPort;
+    this.userAccountRepository = userAccountRepository;
     this.fsrsScheduler = new FsrsScheduler();
     this.sm2Scheduler = new Sm2Scheduler();
   }
@@ -174,7 +180,7 @@ public final class ReviewService
             .orElseGet(() -> CardScheduleState.newFsrsCard(now));
 
     // 3. Resolve scheduler preset for the deck
-    SchedulerPreset preset = resolvePreset(card);
+    SchedulerPreset preset = resolvePreset(card, command.ownerId());
 
     // 4. Select the correct scheduling engine
     SchedulingEngine engine = engineFor(current.algorithm());
@@ -262,14 +268,16 @@ public final class ReviewService
     findOwnedDeck(query.ownerId(), query.deckId());
 
     Instant now = clockPort.now();
-    Instant dayStart = now.truncatedTo(ChronoUnit.DAYS);
-    Instant dayEnd = dayStart.plus(Duration.ofDays(1));
+    ZoneId zone = query.zone();
+    LocalDate today = now.atZone(zone).toLocalDate();
+    Instant dayStart = today.atStartOfDay(zone).toInstant();
+    Instant dayEnd = today.plusDays(1).atStartOfDay(zone).toInstant();
     Instant sevenDaysAgo = now.minus(Duration.ofDays(7));
     Instant thirtyDaysAgo = now.minus(Duration.ofDays(30));
 
-    // Total notes and cards
-    long totalNotesL = noteRepository.countAll(query.deckId(), null, null, null);
-    long totalCardsL = cardRepository.countAll(query.deckId(), null);
+    // Total notes and cards (owner-scoped — deckId is always non-null here after findOwnedDeck)
+    long totalNotesL = noteRepository.countAll(query.ownerId(), query.deckId(), null, null, null);
+    long totalCardsL = cardRepository.countAll(query.ownerId(), query.deckId(), null);
     long dueCountL =
         scheduleStateRepository
             .findDueCardIds(query.ownerId(), query.deckId(), now, Integer.MAX_VALUE)
@@ -277,7 +285,7 @@ public final class ReviewService
     long newCardsL = scheduleStateRepository.countNewByDeck(query.ownerId(), query.deckId());
     int reviewedToday =
         reviewLogRepository.countReviewedToday(query.ownerId(), query.deckId(), dayStart, dayEnd);
-    long suspendedL = cardRepository.countAll(query.deckId(), true);
+    long suspendedL = cardRepository.countAll(query.ownerId(), query.deckId(), true);
 
     Double againRate =
         reviewLogRepository.againRate7d(query.ownerId(), query.deckId(), sevenDaysAgo);
@@ -331,9 +339,14 @@ public final class ReviewService
     return card;
   }
 
-  private SchedulerPreset resolvePreset(Card card) {
-    // Future: look up deck → scheduler_preset link. For now default to FSRS @ 0.9.
-    return SchedulerPreset.fsrsDefault();
+  private SchedulerPreset resolvePreset(Card card, OwnerId ownerId) {
+    double retention =
+        userAccountRepository
+            .findById(ownerId)
+            .map(UserAccount::getDesiredRetention)
+            .map(r -> Math.max(0.70, r))
+            .orElse(0.9);
+    return SchedulerPreset.defaults(SchedulerAlgorithm.FSRS, retention);
   }
 
   private SchedulingEngine engineFor(SchedulerAlgorithm algorithm) {

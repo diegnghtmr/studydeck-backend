@@ -1,5 +1,6 @@
 package com.studydeck.integration;
 
+import com.studydeck.domain.model.AiProviderConfig;
 import com.studydeck.domain.model.DocumentId;
 import com.studydeck.domain.model.OwnerId;
 import com.studydeck.domain.port.out.AiChatPort;
@@ -136,13 +137,21 @@ public class AiTestConfiguration {
       }
 
       @Override
-      public RagAnswer ragChat(String question, OwnerId ownerId, List<ContextChunk> contextChunks) {
+      public RagAnswer ragChat(
+          String question,
+          OwnerId ownerId,
+          List<ContextChunk> contextChunks,
+          AiProviderConfig override) {
         throw new AiChatUnavailableException();
       }
 
       @Override
       public String generateFlashcardsRaw(
-          String sourceText, String deckContext, List<String> noteTypes, int maxCards) {
+          String sourceText,
+          String deckContext,
+          List<String> noteTypes,
+          int maxCards,
+          AiProviderConfig override) {
         throw new AiChatUnavailableException();
       }
 

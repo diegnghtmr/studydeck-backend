@@ -42,6 +42,7 @@ import com.studydeck.domain.port.in.PreviewImportUseCase;
 import com.studydeck.domain.port.in.ProvisionUserUseCase;
 import com.studydeck.domain.port.in.StartReviewSessionUseCase;
 import com.studydeck.domain.port.in.SubmitReviewUseCase;
+import com.studydeck.domain.port.in.UnarchiveDeckUseCase;
 import com.studydeck.domain.port.in.UpdateCardUseCase;
 import com.studydeck.domain.port.in.UpdateDeckUseCase;
 import com.studydeck.domain.port.in.UpdateNoteUseCase;
@@ -53,6 +54,7 @@ import com.studydeck.domain.port.out.CardScheduleStateRepository;
 import com.studydeck.domain.port.out.ClockPort;
 import com.studydeck.domain.port.out.DeckRepository;
 import com.studydeck.domain.port.out.IdGenerator;
+import com.studydeck.domain.port.out.IdpAdminPort;
 import com.studydeck.domain.port.out.ImportJobRepository;
 import com.studydeck.domain.port.out.NoteHashRepository;
 import com.studydeck.domain.port.out.NoteRepository;
@@ -160,6 +162,15 @@ public class BeanConfiguration {
 
   @Bean
   ArchiveDeckUseCase archiveDeckUseCase(
+      DeckRepository deckRepository,
+      AuditEventPort auditEventPort,
+      IdGenerator idGenerator,
+      ClockPort clockPort) {
+    return new DeckService(deckRepository, auditEventPort, idGenerator, clockPort);
+  }
+
+  @Bean
+  UnarchiveDeckUseCase unarchiveDeckUseCase(
       DeckRepository deckRepository,
       AuditEventPort auditEventPort,
       IdGenerator idGenerator,
@@ -360,7 +371,8 @@ public class BeanConfiguration {
       ReviewLogRepository reviewLogRepository,
       ReviewSessionRepository reviewSessionRepository,
       AuditEventPort auditEventPort,
-      ClockPort clockPort) {
+      ClockPort clockPort,
+      UserAccountRepository userAccountRepository) {
     return new ReviewService(
         deckRepository,
         noteRepository,
@@ -369,7 +381,8 @@ public class BeanConfiguration {
         reviewLogRepository,
         reviewSessionRepository,
         auditEventPort,
-        clockPort);
+        clockPort,
+        userAccountRepository);
   }
 
   @Bean
@@ -381,7 +394,8 @@ public class BeanConfiguration {
       ReviewLogRepository reviewLogRepository,
       ReviewSessionRepository reviewSessionRepository,
       AuditEventPort auditEventPort,
-      ClockPort clockPort) {
+      ClockPort clockPort,
+      UserAccountRepository userAccountRepository) {
     return reviewService(
         deckRepository,
         noteRepository,
@@ -390,7 +404,8 @@ public class BeanConfiguration {
         reviewLogRepository,
         reviewSessionRepository,
         auditEventPort,
-        clockPort);
+        clockPort,
+        userAccountRepository);
   }
 
   @Bean
@@ -402,7 +417,8 @@ public class BeanConfiguration {
       ReviewLogRepository reviewLogRepository,
       ReviewSessionRepository reviewSessionRepository,
       AuditEventPort auditEventPort,
-      ClockPort clockPort) {
+      ClockPort clockPort,
+      UserAccountRepository userAccountRepository) {
     return reviewService(
         deckRepository,
         noteRepository,
@@ -411,7 +427,8 @@ public class BeanConfiguration {
         reviewLogRepository,
         reviewSessionRepository,
         auditEventPort,
-        clockPort);
+        clockPort,
+        userAccountRepository);
   }
 
   @Bean
@@ -423,7 +440,8 @@ public class BeanConfiguration {
       ReviewLogRepository reviewLogRepository,
       ReviewSessionRepository reviewSessionRepository,
       AuditEventPort auditEventPort,
-      ClockPort clockPort) {
+      ClockPort clockPort,
+      UserAccountRepository userAccountRepository) {
     return reviewService(
         deckRepository,
         noteRepository,
@@ -432,7 +450,8 @@ public class BeanConfiguration {
         reviewLogRepository,
         reviewSessionRepository,
         auditEventPort,
-        clockPort);
+        clockPort,
+        userAccountRepository);
   }
 
   @Bean
@@ -444,7 +463,8 @@ public class BeanConfiguration {
       ReviewLogRepository reviewLogRepository,
       ReviewSessionRepository reviewSessionRepository,
       AuditEventPort auditEventPort,
-      ClockPort clockPort) {
+      ClockPort clockPort,
+      UserAccountRepository userAccountRepository) {
     return reviewService(
         deckRepository,
         noteRepository,
@@ -453,7 +473,8 @@ public class BeanConfiguration {
         reviewLogRepository,
         reviewSessionRepository,
         auditEventPort,
-        clockPort);
+        clockPort,
+        userAccountRepository);
   }
 
   @Bean
@@ -465,7 +486,8 @@ public class BeanConfiguration {
       ReviewLogRepository reviewLogRepository,
       ReviewSessionRepository reviewSessionRepository,
       AuditEventPort auditEventPort,
-      ClockPort clockPort) {
+      ClockPort clockPort,
+      UserAccountRepository userAccountRepository) {
     return reviewService(
         deckRepository,
         noteRepository,
@@ -474,7 +496,8 @@ public class BeanConfiguration {
         reviewLogRepository,
         reviewSessionRepository,
         auditEventPort,
-        clockPort);
+        clockPort,
+        userAccountRepository);
   }
 
   @Bean
@@ -486,7 +509,8 @@ public class BeanConfiguration {
       ReviewLogRepository reviewLogRepository,
       ReviewSessionRepository reviewSessionRepository,
       AuditEventPort auditEventPort,
-      ClockPort clockPort) {
+      ClockPort clockPort,
+      UserAccountRepository userAccountRepository) {
     return reviewService(
         deckRepository,
         noteRepository,
@@ -495,7 +519,8 @@ public class BeanConfiguration {
         reviewLogRepository,
         reviewSessionRepository,
         auditEventPort,
-        clockPort);
+        clockPort,
+        userAccountRepository);
   }
 
   @Bean
@@ -507,7 +532,8 @@ public class BeanConfiguration {
       ReviewLogRepository reviewLogRepository,
       ReviewSessionRepository reviewSessionRepository,
       AuditEventPort auditEventPort,
-      ClockPort clockPort) {
+      ClockPort clockPort,
+      UserAccountRepository userAccountRepository) {
     return reviewService(
         deckRepository,
         noteRepository,
@@ -516,7 +542,8 @@ public class BeanConfiguration {
         reviewLogRepository,
         reviewSessionRepository,
         auditEventPort,
-        clockPort);
+        clockPort,
+        userAccountRepository);
   }
 
   // ---------------------------------------------------------------
@@ -681,7 +708,9 @@ public class BeanConfiguration {
 
   @Bean
   DeleteAccountUseCase deleteAccountUseCase(
-      UserAccountRepository userAccountRepository, AuditEventPort auditEventPort) {
-    return new DeleteAccountService(userAccountRepository, auditEventPort);
+      UserAccountRepository userAccountRepository,
+      AuditEventPort auditEventPort,
+      IdpAdminPort idpAdminPort) {
+    return new DeleteAccountService(userAccountRepository, auditEventPort, idpAdminPort);
   }
 }

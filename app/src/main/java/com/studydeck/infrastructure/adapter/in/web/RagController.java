@@ -1,5 +1,6 @@
 package com.studydeck.infrastructure.adapter.in.web;
 
+import com.studydeck.domain.model.AiProviderConfig;
 import com.studydeck.domain.model.DocumentId;
 import com.studydeck.domain.model.OwnerId;
 import com.studydeck.domain.port.in.RagChatUseCase;
@@ -87,12 +88,27 @@ class RagController {
       @AuthenticationPrincipal Jwt jwt, @RequestBody RagChatRequestDto request) {
     var ownerId = ownerIdFrom(jwt);
     try {
+      AiProviderConfig providerConfig = null;
+      if (request.providerOverride() != null) {
+        var dto = request.providerOverride();
+        if (dto.baseUrl() == null
+            || dto.baseUrl().isBlank()
+            || dto.apiKey() == null
+            || dto.apiKey().isBlank()
+            || dto.model() == null
+            || dto.model().isBlank()) {
+          throw new IllegalArgumentException(
+              "providerOverride requires all fields: baseUrl, apiKey, model");
+        }
+        providerConfig = new AiProviderConfig(dto.baseUrl(), dto.apiKey(), dto.model());
+      }
       var cmd =
           new RagChatUseCase.Command(
               request.message(),
               ownerId,
               toDocumentIds(request.documentIds()),
-              request.topK() != null ? request.topK() : 5);
+              request.topK() != null ? request.topK() : 5,
+              providerConfig);
       var answer = ragChat.execute(cmd);
 
       var citations =
@@ -149,5 +165,13 @@ class RagController {
       Double minScore,
       Boolean includeContent) {}
 
-  record RagChatRequestDto(String message, List<UUID> documentIds, Integer topK, Boolean stream) {}
+  record RagChatRequestDto(
+      String message,
+      List<UUID> documentIds,
+      Integer topK,
+      Boolean stream,
+      AiProviderConfigDto providerOverride) {}
+
+  /** Per-request AI provider config for BYOK (Bring Your Own Key) support. */
+  record AiProviderConfigDto(String baseUrl, String apiKey, String model) {}
 }

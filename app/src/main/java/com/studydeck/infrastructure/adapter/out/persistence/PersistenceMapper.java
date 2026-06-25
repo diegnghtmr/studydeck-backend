@@ -14,6 +14,7 @@ import com.studydeck.domain.model.NoteType;
 import com.studydeck.domain.model.OwnerId;
 import com.studydeck.domain.model.UserAccount;
 import com.studydeck.domain.model.UserAccountStatus;
+import java.math.BigDecimal;
 import java.util.List;
 import tools.jackson.core.JacksonException;
 import tools.jackson.databind.json.JsonMapper;
@@ -151,6 +152,10 @@ class PersistenceMapper {
         e.getDisplayName(),
         UserAccountStatus.valueOf(e.getStatus()),
         e.getDailyGoal(),
+        e.getDesiredRetention() != null ? e.getDesiredRetention().doubleValue() : 0.90,
+        e.getNewCardsPerDay(),
+        e.getLanguage() != null ? e.getLanguage() : "en",
+        e.getTimezone() != null ? e.getTimezone() : "UTC",
         e.getCreatedAt(),
         e.getUpdatedAt());
   }
@@ -162,6 +167,10 @@ class PersistenceMapper {
     e.setDisplayName(account.getDisplayName());
     e.setStatus(account.getStatus().name());
     e.setDailyGoal(account.getDailyGoal());
+    e.setDesiredRetention(BigDecimal.valueOf(account.getDesiredRetention()));
+    e.setNewCardsPerDay(account.getNewCardsPerDay());
+    e.setLanguage(account.getLanguage());
+    e.setTimezone(account.getTimezone());
     e.setCreatedAt(account.getCreatedAt());
     e.setUpdatedAt(account.getUpdatedAt());
     return e;

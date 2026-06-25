@@ -24,5 +24,9 @@ public interface GetUserStatsQuery {
       long reviewedToday,
       int dayStreak,
       Double retention30d,
-      int dailyGoal) {}
+      int dailyGoal,
+      double desiredRetention,
+      int newCardsPerDay,
+      String language,
+      String timezone) {}
 }

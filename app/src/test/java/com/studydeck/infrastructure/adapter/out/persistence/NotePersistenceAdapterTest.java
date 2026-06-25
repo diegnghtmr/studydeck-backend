@@ -210,7 +210,7 @@ class NotePersistenceAdapterTest {
       em.flush();
       em.clear();
 
-      List<Note> result = noteRepository.findAll(deckId, null, null, null, 0, 10);
+      List<Note> result = noteRepository.findAll(alice, deckId, null, null, null, 0, 10);
       assertThat(result).hasSize(1);
     }
 
@@ -224,7 +224,7 @@ class NotePersistenceAdapterTest {
       em.flush();
       em.clear();
 
-      List<Note> result = noteRepository.findAll(deckId, NoteType.BASIC, null, null, 0, 10);
+      List<Note> result = noteRepository.findAll(alice, deckId, NoteType.BASIC, null, null, 0, 10);
       assertThat(result).hasSize(1);
       assertThat(result.getFirst().getNoteType()).isEqualTo(NoteType.BASIC);
     }
@@ -241,7 +241,7 @@ class NotePersistenceAdapterTest {
       em.flush();
       em.clear();
 
-      List<Note> result = noteRepository.findAll(deckId, null, "java", null, 0, 10);
+      List<Note> result = noteRepository.findAll(alice, deckId, null, "java", null, 0, 10);
       assertThat(result).hasSize(1);
       assertThat(result.getFirst().getTags()).contains("java");
     }
@@ -256,8 +256,8 @@ class NotePersistenceAdapterTest {
       em.flush();
       em.clear();
 
-      List<Note> page0 = noteRepository.findAll(deckId, null, null, null, 0, 2);
-      List<Note> page1 = noteRepository.findAll(deckId, null, null, null, 2, 2);
+      List<Note> page0 = noteRepository.findAll(alice, deckId, null, null, null, 0, 2);
+      List<Note> page1 = noteRepository.findAll(alice, deckId, null, null, null, 2, 2);
 
       assertThat(page0).hasSize(2);
       assertThat(page1).hasSize(2);
@@ -273,7 +273,7 @@ class NotePersistenceAdapterTest {
       em.flush();
       em.clear();
 
-      long count = noteRepository.countAll(deckId, null, null, null);
+      long count = noteRepository.countAll(alice, deckId, null, null, null);
       assertThat(count).isEqualTo(3);
     }
   }
@@ -314,5 +314,72 @@ class NotePersistenceAdapterTest {
     em.clear();
 
     assertThat(findById(note.getId())).isEmpty();
+  }
+
+  // ---------------------------------------------------------------
+  // SECURITY: IDOR — cross-tenant isolation (Issue 1)
+  // ---------------------------------------------------------------
+
+  @Nested
+  @DisplayName("IDOR: owner-scoped note listing")
+  class OwnerScopedListingTests {
+
+    private OwnerId bob;
+    private DeckId bobDeckId;
+
+    @BeforeEach
+    void seedBob() {
+      bob = OwnerId.generate();
+      UUID bobUuid = bob.value();
+      em.createNativeQuery(
+              "INSERT INTO user_account(id, email, display_name) VALUES (:id, :email, :name)"
+                  + " ON CONFLICT DO NOTHING")
+          .setParameter("id", bobUuid)
+          .setParameter("email", bobUuid + "@test.com")
+          .setParameter("name", "Bob")
+          .executeUpdate();
+
+      bobDeckId = DeckId.generate();
+      deckRepository.save(Deck.create(bobDeckId, bob, "Bob Deck", null));
+      em.flush();
+      em.clear();
+    }
+
+    @Test
+    @DisplayName("findAll(ownerId=alice, deckId=null) must NOT return Bob's notes")
+    void findAllWithNullDeckIdReturnsOnlyOwnersNotes() {
+      // Seed one note for Alice
+      Note aliceNote =
+          Note.create(NoteId.generate(), deckId, new NoteContent.Basic("Alice Q", "Alice A"), null);
+      noteRepository.save(aliceNote);
+
+      // Seed one note for Bob
+      Note bobNote =
+          Note.create(NoteId.generate(), bobDeckId, new NoteContent.Basic("Bob Q", "Bob A"), null);
+      noteRepository.save(bobNote);
+      em.flush();
+      em.clear();
+
+      // Alice lists her notes without specifying a deckId — must see only her own
+      List<Note> result = noteRepository.findAll(alice, null, null, null, null, 0, 10);
+
+      assertThat(result).hasSize(1);
+      assertThat(result.getFirst().getDeckId()).isEqualTo(deckId);
+    }
+
+    @Test
+    @DisplayName("countAll(ownerId=alice, deckId=null) must NOT count Bob's notes")
+    void countAllWithNullDeckIdCountsOnlyOwnersNotes() {
+      noteRepository.save(
+          Note.create(NoteId.generate(), deckId, new NoteContent.Basic("A Q", "A A"), null));
+      noteRepository.save(
+          Note.create(NoteId.generate(), bobDeckId, new NoteContent.Basic("B Q", "B A"), null));
+      em.flush();
+      em.clear();
+
+      long count = noteRepository.countAll(alice, null, null, null, null);
+
+      assertThat(count).isEqualTo(1);
+    }
   }
 }

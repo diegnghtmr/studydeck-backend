@@ -73,7 +73,8 @@ class StatsControllerTest {
 
   @Test
   void getUserStats_returns200WithExpectedFields() throws Exception {
-    when(getUserStats.execute(any())).thenReturn(new UserStatsResult(5L, 10L, 3L, 7, 0.85, 50));
+    when(getUserStats.execute(any()))
+        .thenReturn(new UserStatsResult(5L, 10L, 3L, 7, 0.85, 50, 0.90, 10, "en", "UTC"));
 
     mockMvc
         .perform(get("/v1/stats").with(jwt().jwt(j -> j.subject(OWNER_ID.toString()))))
@@ -83,7 +84,11 @@ class StatsControllerTest {
         .andExpect(jsonPath("$.reviewedToday").value(3))
         .andExpect(jsonPath("$.dayStreak").value(7))
         .andExpect(jsonPath("$.retention30d").value(0.85))
-        .andExpect(jsonPath("$.dailyGoal").value(50));
+        .andExpect(jsonPath("$.dailyGoal").value(50))
+        .andExpect(jsonPath("$.desiredRetention").value(0.90))
+        .andExpect(jsonPath("$.newCardsPerDay").value(10))
+        .andExpect(jsonPath("$.language").value("en"))
+        .andExpect(jsonPath("$.timezone").value("UTC"));
   }
 
   @Test
@@ -93,7 +98,8 @@ class StatsControllerTest {
 
   @Test
   void getUserStats_withTzParam_returns200() throws Exception {
-    when(getUserStats.execute(any())).thenReturn(new UserStatsResult(0L, 0L, 0L, 0, null, 40));
+    when(getUserStats.execute(any()))
+        .thenReturn(new UserStatsResult(0L, 0L, 0L, 0, null, 40, 0.90, 10, "en", "UTC"));
 
     mockMvc
         .perform(
@@ -107,7 +113,8 @@ class StatsControllerTest {
 
   @Test
   void getUserStats_withInvalidTz_defaultsToUtc_returns200() throws Exception {
-    when(getUserStats.execute(any())).thenReturn(new UserStatsResult(1L, 2L, 0L, 1, null, 40));
+    when(getUserStats.execute(any()))
+        .thenReturn(new UserStatsResult(1L, 2L, 0L, 1, null, 40, 0.90, 10, "en", "UTC"));
 
     mockMvc
         .perform(
@@ -116,6 +123,21 @@ class StatsControllerTest {
                 .with(jwt().jwt(j -> j.subject(OWNER_ID.toString()))))
         .andExpect(status().isOk())
         .andExpect(jsonPath("$.dueToday").value(1));
+  }
+
+  @Test
+  void getUserStats_includesPreferenceFields() throws Exception {
+    when(getUserStats.execute(any()))
+        .thenReturn(
+            new UserStatsResult(2L, 5L, 1L, 3, 0.78, 30, 0.85, 20, "es", "America/Sao_Paulo"));
+
+    mockMvc
+        .perform(get("/v1/stats").with(jwt().jwt(j -> j.subject(OWNER_ID.toString()))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.desiredRetention").value(0.85))
+        .andExpect(jsonPath("$.newCardsPerDay").value(20))
+        .andExpect(jsonPath("$.language").value("es"))
+        .andExpect(jsonPath("$.timezone").value("America/Sao_Paulo"));
   }
 
   @Test

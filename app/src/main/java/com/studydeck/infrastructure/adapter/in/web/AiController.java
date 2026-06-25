@@ -1,5 +1,6 @@
 package com.studydeck.infrastructure.adapter.in.web;
 
+import com.studydeck.domain.model.AiProviderConfig;
 import com.studydeck.domain.model.OwnerId;
 import com.studydeck.domain.port.in.GenerateFlashcardsUseCase;
 import com.studydeck.domain.port.in.ImproveFlashcardUseCase;
@@ -67,13 +68,28 @@ class AiController {
       throw new IllegalArgumentException("source.content is required and must not be blank");
     }
     try {
+      AiProviderConfig providerConfig = null;
+      if (request.providerOverride() != null) {
+        var dto = request.providerOverride();
+        if (dto.baseUrl() == null
+            || dto.baseUrl().isBlank()
+            || dto.apiKey() == null
+            || dto.apiKey().isBlank()
+            || dto.model() == null
+            || dto.model().isBlank()) {
+          throw new IllegalArgumentException(
+              "providerOverride requires all fields: baseUrl, apiKey, model");
+        }
+        providerConfig = new AiProviderConfig(dto.baseUrl(), dto.apiKey(), dto.model());
+      }
       var cmd =
           new GenerateFlashcardsUseCase.Command(
               ownerId,
               request.source().content(),
               request.deckId() != null ? request.deckId().toString() : null,
               request.preferredTypes(),
-              request.maxItems() != null ? request.maxItems() : 10);
+              request.maxItems() != null ? request.maxItems() : 10,
+              providerConfig);
       var result = generateFlashcards.execute(cmd);
 
       // Map the validated FlashcardImportV1 envelope to the contract GenerateFlashcardsResponse.
@@ -212,7 +228,8 @@ class AiController {
       List<String> preferredTypes,
       Integer maxItems,
       String language,
-      String difficulty) {
+      String difficulty,
+      AiProviderConfigDto providerOverride) {
 
     record SourceDto(String type, String content, List<UUID> documentIds) {}
   }
@@ -220,4 +237,7 @@ class AiController {
   /** Matches the openapi {@code ImproveFlashcardRequest} schema. */
   record ImproveFlashcardRequestDto(
       String noteType, Map<String, Object> content, String objective, Boolean preserveMeaning) {}
+
+  /** Per-request AI provider config for BYOK (Bring Your Own Key) support. */
+  record AiProviderConfigDto(String baseUrl, String apiKey, String model) {}
 }

@@ -288,8 +288,8 @@ class CardPersistenceAdapterTest {
       em.flush();
       em.clear();
 
-      List<Card> page0 = cardRepository.findAll(deckId, null, 0, 2);
-      List<Card> page1 = cardRepository.findAll(deckId, null, 2, 2);
+      List<Card> page0 = cardRepository.findAll(alice, deckId, null, 0, 2);
+      List<Card> page1 = cardRepository.findAll(alice, deckId, null, 2, 2);
 
       assertThat(page0).hasSize(2);
       assertThat(page1).hasSize(2);
@@ -312,8 +312,108 @@ class CardPersistenceAdapterTest {
       em.flush();
       em.clear();
 
-      long count = cardRepository.countAll(deckId, null);
+      long count = cardRepository.countAll(alice, deckId, null);
       assertThat(count).isEqualTo(3);
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // SECURITY: IDOR — cross-tenant isolation (Issue 2)
+  // ---------------------------------------------------------------
+
+  @Nested
+  @DisplayName("IDOR: owner-scoped card listing")
+  class OwnerScopedCardListingTests {
+
+    private OwnerId bob;
+    private DeckId bobDeckId;
+    private NoteId bobNoteId;
+
+    @BeforeEach
+    void seedBob() {
+      bob = OwnerId.generate();
+      UUID bobUuid = bob.value();
+      em.createNativeQuery(
+              "INSERT INTO user_account(id, email, display_name) VALUES (:id, :email, :name)"
+                  + " ON CONFLICT DO NOTHING")
+          .setParameter("id", bobUuid)
+          .setParameter("email", bobUuid + "@test.com")
+          .setParameter("name", "Bob")
+          .executeUpdate();
+
+      bobDeckId = DeckId.generate();
+      deckRepository.save(Deck.create(bobDeckId, bob, "Bob Deck", null));
+
+      bobNoteId = NoteId.generate();
+      noteRepository.save(
+          Note.create(bobNoteId, bobDeckId, new NoteContent.Basic("Bob Q", "Bob A"), null));
+      em.flush();
+      em.clear();
+    }
+
+    @Test
+    @DisplayName("findAll(ownerId=alice, deckId=null) must NOT return Bob's cards")
+    void findAllWithNullDeckIdReturnsOnlyOwnersCards() {
+      // Alice's card (already created via setUp noteId / deckId)
+      Card aliceCard =
+          Card.create(
+              CardId.generate(),
+              noteId,
+              NoteType.BASIC,
+              "forward",
+              0,
+              new CardPayload.BasicPrompt("Alice Q"),
+              new CardPayload.BasicAnswer("Alice A"));
+      cardRepository.save(aliceCard);
+
+      // Bob's card
+      Card bobCard =
+          Card.create(
+              CardId.generate(),
+              bobNoteId,
+              NoteType.BASIC,
+              "forward",
+              0,
+              new CardPayload.BasicPrompt("Bob Q"),
+              new CardPayload.BasicAnswer("Bob A"));
+      cardRepository.save(bobCard);
+      em.flush();
+      em.clear();
+
+      // Alice lists without deckId — must see only her own card
+      List<Card> result = cardRepository.findAll(alice, null, null, 0, 10);
+
+      assertThat(result).hasSize(1);
+      assertThat(result.getFirst().getNoteId()).isEqualTo(noteId);
+    }
+
+    @Test
+    @DisplayName("countAll(ownerId=alice, deckId=null) must NOT count Bob's cards")
+    void countAllWithNullDeckIdCountsOnlyOwnersCards() {
+      cardRepository.save(
+          Card.create(
+              CardId.generate(),
+              noteId,
+              NoteType.BASIC,
+              "forward",
+              0,
+              new CardPayload.BasicPrompt("Alice Q"),
+              new CardPayload.BasicAnswer("Alice A")));
+      cardRepository.save(
+          Card.create(
+              CardId.generate(),
+              bobNoteId,
+              NoteType.BASIC,
+              "forward",
+              0,
+              new CardPayload.BasicPrompt("Bob Q"),
+              new CardPayload.BasicAnswer("Bob A")));
+      em.flush();
+      em.clear();
+
+      long count = cardRepository.countAll(alice, null, null);
+
+      assertThat(count).isEqualTo(1);
     }
   }
 }

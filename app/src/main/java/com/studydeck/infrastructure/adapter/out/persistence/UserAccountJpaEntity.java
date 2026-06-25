@@ -4,6 +4,7 @@ import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.Id;
 import jakarta.persistence.Table;
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.UUID;
 
@@ -29,6 +30,18 @@ class UserAccountJpaEntity {
 
   @Column(name = "daily_goal", nullable = false)
   private int dailyGoal = 40;
+
+  @Column(name = "desired_retention", nullable = false, precision = 3, scale = 2)
+  private BigDecimal desiredRetention = new BigDecimal("0.90");
+
+  @Column(name = "new_cards_per_day", nullable = false)
+  private int newCardsPerDay = 10;
+
+  @Column(name = "language", nullable = false, length = 5)
+  private String language = "en";
+
+  @Column(name = "timezone", nullable = false, length = 64)
+  private String timezone = "UTC";
 
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
@@ -78,6 +91,38 @@ class UserAccountJpaEntity {
 
   void setDailyGoal(int dailyGoal) {
     this.dailyGoal = dailyGoal;
+  }
+
+  BigDecimal getDesiredRetention() {
+    return desiredRetention;
+  }
+
+  void setDesiredRetention(BigDecimal desiredRetention) {
+    this.desiredRetention = desiredRetention;
+  }
+
+  int getNewCardsPerDay() {
+    return newCardsPerDay;
+  }
+
+  void setNewCardsPerDay(int newCardsPerDay) {
+    this.newCardsPerDay = newCardsPerDay;
+  }
+
+  String getLanguage() {
+    return language;
+  }
+
+  void setLanguage(String language) {
+    this.language = language;
+  }
+
+  String getTimezone() {
+    return timezone;
+  }
+
+  void setTimezone(String timezone) {
+    this.timezone = timezone;
   }
 
   Instant getCreatedAt() {

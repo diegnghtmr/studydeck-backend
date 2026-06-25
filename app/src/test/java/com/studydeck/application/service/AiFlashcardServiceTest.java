@@ -76,7 +76,7 @@ class AiFlashcardServiceTest {
     @DisplayName("valid AI output returns schema-valid proposals with requiresApproval=true")
     void validOutputReturnsProposals() {
       when(chatPort.isAvailable()).thenReturn(true);
-      when(chatPort.generateFlashcardsRaw(anyString(), any(), anyList(), anyInt()))
+      when(chatPort.generateFlashcardsRaw(anyString(), any(), anyList(), anyInt(), any()))
           .thenReturn(VALID_FLASHCARD_JSON);
       when(schemaValidator.validateAndReturn(VALID_FLASHCARD_JSON))
           .thenReturn(VALID_FLASHCARD_JSON);
@@ -84,7 +84,7 @@ class AiFlashcardServiceTest {
       var result =
           generateService.execute(
               new GenerateFlashcardsUseCase.Command(
-                  ownerId, "Cell biology text", "Biology", List.of("basic"), 5));
+                  ownerId, "Cell biology text", "Biology", List.of("basic"), 5, null));
 
       assertThat(result.proposalsJson()).isEqualTo(VALID_FLASHCARD_JSON);
       assertThat(result.requiresApproval()).isTrue();
@@ -94,7 +94,7 @@ class AiFlashcardServiceTest {
     @DisplayName("malformed AI output is REJECTED by schema validator")
     void malformedOutputIsRejected() {
       when(chatPort.isAvailable()).thenReturn(true);
-      when(chatPort.generateFlashcardsRaw(anyString(), any(), anyList(), anyInt()))
+      when(chatPort.generateFlashcardsRaw(anyString(), any(), anyList(), anyInt(), any()))
           .thenReturn(INVALID_FLASHCARD_JSON);
       when(schemaValidator.validateAndReturn(INVALID_FLASHCARD_JSON))
           .thenThrow(
@@ -105,7 +105,7 @@ class AiFlashcardServiceTest {
               () ->
                   generateService.execute(
                       new GenerateFlashcardsUseCase.Command(
-                          ownerId, "some text", null, List.of("basic"), 5)))
+                          ownerId, "some text", null, List.of("basic"), 5, null)))
           .isInstanceOf(AiSchemaValidationPort.AiOutputSchemaViolationException.class)
           .hasMessageContaining("FlashcardImportV1 schema validation");
     }
@@ -119,7 +119,7 @@ class AiFlashcardServiceTest {
               () ->
                   generateService.execute(
                       new GenerateFlashcardsUseCase.Command(
-                          ownerId, "text", null, List.of("basic"), 5)))
+                          ownerId, "text", null, List.of("basic"), 5, null)))
           .isInstanceOf(AiChatPort.AiChatUnavailableException.class);
     }
   }

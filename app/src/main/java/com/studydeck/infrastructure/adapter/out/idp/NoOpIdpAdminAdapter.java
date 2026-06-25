@@ -1,6 +1,8 @@
 package com.studydeck.infrastructure.adapter.out.idp;
 
+import com.studydeck.domain.model.IdpSession;
 import com.studydeck.domain.port.out.IdpAdminPort;
+import java.util.List;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -29,5 +31,22 @@ class NoOpIdpAdminAdapter implements IdpAdminPort {
         "IdP admin not configured — skipping session logout for idpUserId={}. "
             + "Set studydeck.idp.admin.base-url to enable.",
         idpUserId);
+  }
+
+  @Override
+  public List<IdpSession> listSessions(String idpUserId) {
+    log.warn(
+        "IdP admin not configured — returning empty session list for idpUserId={}. "
+            + "Set studydeck.idp.admin.base-url to enable.",
+        idpUserId);
+    return List.of();
+  }
+
+  @Override
+  public void revokeSession(String sessionId) {
+    log.warn(
+        "IdP admin not configured — skipping session revoke for sessionId={}. "
+            + "Set studydeck.idp.admin.base-url to enable.",
+        sessionId);
   }
 }

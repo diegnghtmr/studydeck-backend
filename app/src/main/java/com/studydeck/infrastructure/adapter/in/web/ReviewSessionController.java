@@ -5,6 +5,7 @@ import com.studydeck.domain.model.CardScheduleState;
 import com.studydeck.domain.model.DeckId;
 import com.studydeck.domain.model.OwnerId;
 import com.studydeck.domain.port.in.GetNextCardQuery;
+import com.studydeck.domain.port.in.GetPreviewIntervalsQuery;
 import com.studydeck.domain.port.in.GetReviewSessionQuery;
 import com.studydeck.domain.port.in.StartReviewSessionUseCase;
 import com.studydeck.domain.port.out.CardScheduleStateRepository;
@@ -43,18 +44,21 @@ class ReviewSessionController {
   private final GetNextCardQuery getNextCard;
   private final CardScheduleStateRepository scheduleStateRepository;
   private final CardWebMapper cardMapper;
+  private final GetPreviewIntervalsQuery getPreviewIntervals;
 
   ReviewSessionController(
       @Qualifier("startReviewSessionUseCase") StartReviewSessionUseCase startSession,
       @Qualifier("getReviewSessionQuery") GetReviewSessionQuery getSession,
       @Qualifier("getNextCardQuery") GetNextCardQuery getNextCard,
       CardScheduleStateRepository scheduleStateRepository,
-      CardWebMapper cardMapper) {
+      CardWebMapper cardMapper,
+      @Qualifier("getPreviewIntervalsQuery") GetPreviewIntervalsQuery getPreviewIntervals) {
     this.startSession = startSession;
     this.getSession = getSession;
     this.getNextCard = getNextCard;
     this.scheduleStateRepository = scheduleStateRepository;
     this.cardMapper = cardMapper;
+    this.getPreviewIntervals = getPreviewIntervals;
   }
 
   @PostMapping
@@ -97,7 +101,9 @@ class ReviewSessionController {
         getSession.execute(new GetReviewSessionQuery.Query(ownerId, sessionId));
     UUID deckId = session.deckId() != null ? session.deckId().value() : null;
     CardResponse cardResponse = cardMapper.toResponse(card, deckId, state.orElse(null));
-    return ResponseEntity.ok(new NextReviewCardResponse(sessionId, cardResponse));
+    GetPreviewIntervalsQuery.PreviewIntervals previewIntervals =
+        getPreviewIntervals.execute(new GetPreviewIntervalsQuery.Query(ownerId, card.getId()));
+    return ResponseEntity.ok(new NextReviewCardResponse(sessionId, cardResponse, previewIntervals));
   }
 
   private ReviewSessionResponse toResponse(ReviewSessionView view) {

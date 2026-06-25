@@ -32,7 +32,7 @@ class UserPreferencesServiceTest {
   void updatesDailyGoal() {
     userRepo.save(UserAccount.provision(alice, "alice@test.com", "Alice"));
 
-    sut.execute(new UpdateUserPreferencesUseCase.Command(alice, 25, null, null, null, null));
+    sut.execute(new UpdateUserPreferencesUseCase.Command(alice, 25, null, null, null, null, null));
 
     assertThat(userRepo.findById(alice).orElseThrow().getDailyGoal()).isEqualTo(25);
   }
@@ -43,7 +43,8 @@ class UserPreferencesServiceTest {
     assertThatThrownBy(
             () ->
                 sut.execute(
-                    new UpdateUserPreferencesUseCase.Command(alice, 30, null, null, null, null)))
+                    new UpdateUserPreferencesUseCase.Command(
+                        alice, 30, null, null, null, null, null)))
         .isInstanceOf(NotFoundException.class);
   }
 
@@ -52,7 +53,8 @@ class UserPreferencesServiceTest {
   void updatesDesiredRetention() {
     userRepo.save(UserAccount.provision(alice, "alice@test.com", "Alice"));
 
-    sut.execute(new UpdateUserPreferencesUseCase.Command(alice, null, 0.80, null, null, null));
+    sut.execute(
+        new UpdateUserPreferencesUseCase.Command(alice, null, 0.80, null, null, null, null));
 
     assertThat(userRepo.findById(alice).orElseThrow().getDesiredRetention()).isEqualTo(0.80);
   }
@@ -62,7 +64,8 @@ class UserPreferencesServiceTest {
   void updatesLanguage() {
     userRepo.save(UserAccount.provision(alice, "alice@test.com", "Alice"));
 
-    sut.execute(new UpdateUserPreferencesUseCase.Command(alice, null, null, null, "es", null));
+    sut.execute(
+        new UpdateUserPreferencesUseCase.Command(alice, null, null, null, "es", null, null));
 
     assertThat(userRepo.findById(alice).orElseThrow().getLanguage()).isEqualTo("es");
   }
@@ -77,7 +80,7 @@ class UserPreferencesServiceTest {
     String originalLanguage = original.getLanguage();
     String originalTimezone = original.getTimezone();
 
-    sut.execute(new UpdateUserPreferencesUseCase.Command(alice, 50, null, null, null, null));
+    sut.execute(new UpdateUserPreferencesUseCase.Command(alice, 50, null, null, null, null, null));
 
     UserAccount updated = userRepo.findById(alice).orElseThrow();
     assertThat(updated.getDailyGoal()).isEqualTo(50);
@@ -91,7 +94,8 @@ class UserPreferencesServiceTest {
   @DisplayName("rejects command with null ownerId")
   void rejectsNullOwner() {
     assertThatThrownBy(
-            () -> new UpdateUserPreferencesUseCase.Command(null, null, null, null, null, null))
+            () ->
+                new UpdateUserPreferencesUseCase.Command(null, null, null, null, null, null, null))
         .isInstanceOf(NullPointerException.class);
   }
 }

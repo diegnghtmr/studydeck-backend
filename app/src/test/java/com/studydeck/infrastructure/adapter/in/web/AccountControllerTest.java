@@ -11,11 +11,16 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.studydeck.domain.model.IdpSession;
 import com.studydeck.domain.model.OwnerId;
+import com.studydeck.domain.model.SchedulerAlgorithm;
 import com.studydeck.domain.model.UserAccount;
 import com.studydeck.domain.port.in.DeleteAccountUseCase;
 import com.studydeck.domain.port.in.ExportAccountUseCase;
+import com.studydeck.domain.port.in.GetUserStatsQuery;
+import com.studydeck.domain.port.in.ListSessionsQuery;
 import com.studydeck.domain.port.in.LogoutAllSessionsUseCase;
+import com.studydeck.domain.port.in.RevokeSessionUseCase;
 import com.studydeck.domain.port.in.UpdateUserPreferencesUseCase;
 import com.studydeck.integration.AiTestConfiguration;
 import java.time.Instant;
@@ -86,6 +91,18 @@ class AccountControllerTest {
   @MockitoBean
   @Qualifier("logoutAllSessionsUseCase")
   LogoutAllSessionsUseCase logoutAllSessions;
+
+  @MockitoBean
+  @Qualifier("getUserStatsQuery")
+  GetUserStatsQuery getUserStats;
+
+  @MockitoBean
+  @Qualifier("listSessionsQuery")
+  ListSessionsQuery listSessions;
+
+  @MockitoBean
+  @Qualifier("revokeSessionUseCase")
+  RevokeSessionUseCase revokeSession;
 
   MockMvc mockMvc;
 
@@ -319,5 +336,169 @@ class AccountControllerTest {
             org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
                 "/v1/account/logout-all"))
         .andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void patchPreferences_withSchedulerAlgorithmSm2_returns204() throws Exception {
+    doNothing().when(updateUserPreferences).execute(any());
+
+    mockMvc
+        .perform(
+            patch("/v1/account/preferences")
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"schedulerAlgorithm": "SM2"}
+                    """)
+                .with(
+                    jwt()
+                        .jwt(j -> j.subject(OWNER_ID.toString()))
+                        .authorities(new SimpleGrantedAuthority("SCOPE_study.write"))))
+        .andExpect(status().isNoContent());
+  }
+
+  @Test
+  void patchPreferences_withInvalidSchedulerAlgorithm_returns400() throws Exception {
+    mockMvc
+        .perform(
+            patch("/v1/account/preferences")
+                .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                .content(
+                    """
+                    {"schedulerAlgorithm": "INVALID"}
+                    """)
+                .with(
+                    jwt()
+                        .jwt(j -> j.subject(OWNER_ID.toString()))
+                        .authorities(new SimpleGrantedAuthority("SCOPE_study.write"))))
+        .andExpect(status().isBadRequest());
+  }
+
+  // ---------------------------------------------------------------
+  // GET /v1/account/sessions
+  // ---------------------------------------------------------------
+
+  @Test
+  void listSessions_withStudyWriteScope_returnsSessionList() throws Exception {
+    IdpSession session =
+        new IdpSession(
+            "sess-abc",
+            "192.168.1.1",
+            Instant.parse("2026-01-01T10:00:00Z"),
+            Instant.parse("2026-01-01T11:00:00Z"),
+            java.util.List.of("StudyDeck Web"));
+
+    when(listSessions.execute(any())).thenReturn(java.util.List.of(session));
+
+    mockMvc
+        .perform(
+            get("/v1/account/sessions")
+                .with(
+                    jwt()
+                        .jwt(j -> j.subject(OWNER_ID.toString()).claim("sid", "other-sess"))
+                        .authorities(new SimpleGrantedAuthority("SCOPE_study.write"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].id").value("sess-abc"))
+        .andExpect(jsonPath("$[0].ipAddress").value("192.168.1.1"))
+        .andExpect(jsonPath("$[0].device").value("StudyDeck Web"))
+        .andExpect(jsonPath("$[0].startedAt").isNotEmpty())
+        .andExpect(jsonPath("$[0].lastAccessAt").isNotEmpty())
+        .andExpect(jsonPath("$[0].current").value(false));
+  }
+
+  @Test
+  void listSessions_marksCurrentSession_whenSidMatches() throws Exception {
+    String currentSid = "sess-current";
+    IdpSession session =
+        new IdpSession(
+            currentSid,
+            "10.0.0.1",
+            Instant.parse("2026-01-01T10:00:00Z"),
+            Instant.parse("2026-01-01T11:00:00Z"),
+            java.util.List.of());
+
+    when(listSessions.execute(any())).thenReturn(java.util.List.of(session));
+
+    mockMvc
+        .perform(
+            get("/v1/account/sessions")
+                .with(
+                    jwt()
+                        .jwt(j -> j.subject(OWNER_ID.toString()).claim("sid", currentSid))
+                        .authorities(new SimpleGrantedAuthority("SCOPE_study.write"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$[0].id").value(currentSid))
+        .andExpect(jsonPath("$[0].current").value(true))
+        .andExpect(jsonPath("$[0].device").value("Unknown"));
+  }
+
+  @Test
+  void listSessions_withoutStudyWriteScope_returns403() throws Exception {
+    mockMvc
+        .perform(
+            get("/v1/account/sessions")
+                .with(
+                    jwt()
+                        .jwt(j -> j.subject(OWNER_ID.toString()))
+                        .authorities(new SimpleGrantedAuthority("SCOPE_study.read"))))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void listSessions_withoutAuth_returns401() throws Exception {
+    mockMvc.perform(get("/v1/account/sessions")).andExpect(status().isUnauthorized());
+  }
+
+  // ---------------------------------------------------------------
+  // DELETE /v1/account/sessions/{sessionId}
+  // ---------------------------------------------------------------
+
+  @Test
+  void revokeSession_withStudyWriteScope_returns204() throws Exception {
+    doNothing().when(revokeSession).execute(any());
+
+    mockMvc
+        .perform(
+            delete("/v1/account/sessions/sess-abc")
+                .with(
+                    jwt()
+                        .jwt(j -> j.subject(OWNER_ID.toString()))
+                        .authorities(new SimpleGrantedAuthority("SCOPE_study.write"))))
+        .andExpect(status().isNoContent());
+  }
+
+  @Test
+  void revokeSession_withoutStudyWriteScope_returns403() throws Exception {
+    mockMvc
+        .perform(
+            delete("/v1/account/sessions/sess-abc")
+                .with(
+                    jwt()
+                        .jwt(j -> j.subject(OWNER_ID.toString()))
+                        .authorities(new SimpleGrantedAuthority("SCOPE_study.read"))))
+        .andExpect(status().isForbidden());
+  }
+
+  @Test
+  void revokeSession_withoutAuth_returns401() throws Exception {
+    mockMvc.perform(delete("/v1/account/sessions/sess-abc")).andExpect(status().isUnauthorized());
+  }
+
+  @Test
+  void getStats_returnsSchedulerAlgorithm() throws Exception {
+    when(getUserStats.execute(any()))
+        .thenReturn(
+            new GetUserStatsQuery.UserStatsResult(
+                5L, 3L, 2L, 1, 0.88, 40, 0.90, 10, "en", "UTC", SchedulerAlgorithm.SM2));
+
+    mockMvc
+        .perform(
+            get("/v1/stats")
+                .with(
+                    jwt()
+                        .jwt(j -> j.subject(OWNER_ID.toString()))
+                        .authorities(new SimpleGrantedAuthority("SCOPE_study.read"))))
+        .andExpect(status().isOk())
+        .andExpect(jsonPath("$.schedulerAlgorithm").value("SM2"));
   }
 }

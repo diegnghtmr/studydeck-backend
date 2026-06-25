@@ -12,6 +12,7 @@ import com.studydeck.domain.model.NoteContent;
 import com.studydeck.domain.model.NoteId;
 import com.studydeck.domain.model.NoteType;
 import com.studydeck.domain.model.OwnerId;
+import com.studydeck.domain.model.SchedulerAlgorithm;
 import com.studydeck.domain.model.UserAccount;
 import com.studydeck.domain.model.UserAccountStatus;
 import java.math.BigDecimal;
@@ -156,6 +157,9 @@ class PersistenceMapper {
         e.getNewCardsPerDay(),
         e.getLanguage() != null ? e.getLanguage() : "en",
         e.getTimezone() != null ? e.getTimezone() : "UTC",
+        e.getSchedulerAlgorithm() != null
+            ? SchedulerAlgorithm.valueOf(e.getSchedulerAlgorithm())
+            : SchedulerAlgorithm.FSRS,
         e.getCreatedAt(),
         e.getUpdatedAt());
   }
@@ -171,6 +175,7 @@ class PersistenceMapper {
     e.setNewCardsPerDay(account.getNewCardsPerDay());
     e.setLanguage(account.getLanguage());
     e.setTimezone(account.getTimezone());
+    e.setSchedulerAlgorithm(account.getSchedulerAlgorithm().name());
     e.setCreatedAt(account.getCreatedAt());
     e.setUpdatedAt(account.getUpdatedAt());
     return e;

@@ -1,6 +1,7 @@
 package com.studydeck.application.service;
 
 import com.studydeck.domain.model.OwnerId;
+import com.studydeck.domain.model.SchedulerAlgorithm;
 import com.studydeck.domain.model.UserAccount;
 import com.studydeck.domain.port.in.GetUserStatsQuery;
 import com.studydeck.domain.port.out.CardScheduleStateRepository;
@@ -57,6 +58,8 @@ public final class UserStatsService implements GetUserStatsQuery {
     int newCardsPerDay = accountOpt.map(UserAccount::getNewCardsPerDay).orElse(10);
     String language = accountOpt.map(UserAccount::getLanguage).orElse("en");
     String storedTimezone = accountOpt.map(UserAccount::getTimezone).orElse("UTC");
+    SchedulerAlgorithm schedulerAlgorithm =
+        accountOpt.map(UserAccount::getSchedulerAlgorithm).orElse(SchedulerAlgorithm.FSRS);
 
     // Prefer the user's stored timezone when it differs from UTC
     ZoneId effectiveZone = !"UTC".equals(storedTimezone) ? ZoneId.of(storedTimezone) : queryZone;
@@ -84,7 +87,8 @@ public final class UserStatsService implements GetUserStatsQuery {
         desiredRetention,
         newCardsPerDay,
         language,
-        storedTimezone);
+        storedTimezone,
+        schedulerAlgorithm);
   }
 
   private int computeStreak(OwnerId ownerId, ZoneId zone, LocalDate today) {

@@ -43,6 +43,9 @@ class UserAccountJpaEntity {
   @Column(name = "timezone", nullable = false, length = 64)
   private String timezone = "UTC";
 
+  @Column(name = "scheduler_algorithm", nullable = false, length = 8)
+  private String schedulerAlgorithm = "FSRS";
+
   @Column(name = "created_at", nullable = false)
   private Instant createdAt;
 
@@ -123,6 +126,14 @@ class UserAccountJpaEntity {
 
   void setTimezone(String timezone) {
     this.timezone = timezone;
+  }
+
+  String getSchedulerAlgorithm() {
+    return schedulerAlgorithm;
+  }
+
+  void setSchedulerAlgorithm(String schedulerAlgorithm) {
+    this.schedulerAlgorithm = schedulerAlgorithm;
   }
 
   Instant getCreatedAt() {

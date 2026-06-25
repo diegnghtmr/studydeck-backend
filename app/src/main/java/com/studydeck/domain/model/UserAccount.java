@@ -48,6 +48,7 @@ public final class UserAccount {
   private static final Set<String> ALLOWED_LANGUAGES = Set.of("en", "es", "fr", "pt");
 
   private static final String DEFAULT_TIMEZONE = "UTC";
+  private static final SchedulerAlgorithm DEFAULT_SCHEDULER_ALGORITHM = SchedulerAlgorithm.FSRS;
 
   private final OwnerId id;
   private String email;
@@ -58,6 +59,7 @@ public final class UserAccount {
   private int newCardsPerDay;
   private String language;
   private String timezone;
+  private SchedulerAlgorithm schedulerAlgorithm;
   private final Instant createdAt;
   private Instant updatedAt;
 
@@ -71,6 +73,7 @@ public final class UserAccount {
       int newCardsPerDay,
       String language,
       String timezone,
+      SchedulerAlgorithm schedulerAlgorithm,
       Instant createdAt,
       Instant updatedAt) {
     this.id = id;
@@ -82,6 +85,7 @@ public final class UserAccount {
     this.newCardsPerDay = newCardsPerDay;
     this.language = language;
     this.timezone = timezone;
+    this.schedulerAlgorithm = schedulerAlgorithm;
     this.createdAt = createdAt;
     this.updatedAt = updatedAt;
   }
@@ -107,6 +111,7 @@ public final class UserAccount {
         DEFAULT_NEW_CARDS_PER_DAY,
         DEFAULT_LANGUAGE,
         DEFAULT_TIMEZONE,
+        DEFAULT_SCHEDULER_ALGORITHM,
         now,
         now);
   }
@@ -154,12 +159,13 @@ public final class UserAccount {
         DEFAULT_NEW_CARDS_PER_DAY,
         DEFAULT_LANGUAGE,
         DEFAULT_TIMEZONE,
+        DEFAULT_SCHEDULER_ALGORITHM,
         createdAt,
         updatedAt);
   }
 
   /**
-   * Full reconstitution constructor (11-arg) — used by the persistence adapter.
+   * Full reconstitution constructor (12-arg) — used by the persistence adapter.
    *
    * @param id non-null
    * @param email non-blank
@@ -170,6 +176,7 @@ public final class UserAccount {
    * @param newCardsPerDay 0..999
    * @param language one of en, es, fr, pt
    * @param timezone valid IANA timezone string
+   * @param schedulerAlgorithm non-null
    * @param createdAt non-null
    * @param updatedAt non-null
    */
@@ -183,6 +190,7 @@ public final class UserAccount {
       int newCardsPerDay,
       String language,
       String timezone,
+      SchedulerAlgorithm schedulerAlgorithm,
       Instant createdAt,
       Instant updatedAt) {
     Objects.requireNonNull(id, "UserAccount id must not be null");
@@ -193,6 +201,7 @@ public final class UserAccount {
     validateNewCardsPerDay(newCardsPerDay);
     validateLanguage(language);
     validateTimezone(timezone);
+    Objects.requireNonNull(schedulerAlgorithm, "schedulerAlgorithm must not be null");
     Objects.requireNonNull(createdAt, "UserAccount createdAt must not be null");
     Objects.requireNonNull(updatedAt, "UserAccount updatedAt must not be null");
     return new UserAccount(
@@ -205,6 +214,7 @@ public final class UserAccount {
         newCardsPerDay,
         language,
         timezone,
+        schedulerAlgorithm,
         createdAt,
         updatedAt);
   }
@@ -315,6 +325,16 @@ public final class UserAccount {
 
   public String getTimezone() {
     return timezone;
+  }
+
+  public SchedulerAlgorithm getSchedulerAlgorithm() {
+    return schedulerAlgorithm;
+  }
+
+  public void updateSchedulerAlgorithm(SchedulerAlgorithm newAlgorithm) {
+    Objects.requireNonNull(newAlgorithm, "schedulerAlgorithm must not be null");
+    this.schedulerAlgorithm = newAlgorithm;
+    this.updatedAt = Instant.now();
   }
 
   public Instant getCreatedAt() {

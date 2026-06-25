@@ -50,6 +50,9 @@ public final class UserPreferencesService implements UpdateUserPreferencesUseCas
     if (command.timezone() != null) {
       account.updateTimezone(command.timezone());
     }
+    if (command.schedulerAlgorithm() != null) {
+      account.updateSchedulerAlgorithm(command.schedulerAlgorithm());
+    }
 
     userAccountRepository.save(account);
     auditEventPort.record(

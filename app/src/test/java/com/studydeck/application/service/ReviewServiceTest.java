@@ -30,12 +30,14 @@ import com.studydeck.domain.model.ReviewRating;
 import com.studydeck.domain.model.UserAccount;
 import com.studydeck.domain.model.UserAccountStatus;
 import com.studydeck.domain.port.in.GetDeckStatsQuery;
+import com.studydeck.domain.port.in.GetNextCardQuery;
 import com.studydeck.domain.port.in.ListDueCardsQuery;
 import com.studydeck.domain.port.in.StartReviewSessionUseCase;
 import com.studydeck.domain.port.in.SubmitReviewUseCase;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -382,6 +384,7 @@ class ReviewServiceTest {
               10,
               "en",
               "UTC",
+              com.studydeck.domain.model.SchedulerAlgorithm.FSRS,
               Instant.EPOCH,
               Instant.EPOCH);
       userAccountRepo.save(accountA);
@@ -397,6 +400,7 @@ class ReviewServiceTest {
               10,
               "en",
               "UTC",
+              com.studydeck.domain.model.SchedulerAlgorithm.FSRS,
               Instant.EPOCH,
               Instant.EPOCH);
       userAccountRepo.save(accountB);
@@ -454,6 +458,304 @@ class ReviewServiceTest {
 
       SubmitReviewUseCase.Result result = sut.execute(command);
       assertThat(result.reviewResult().nextState().scheduledDays()).isGreaterThan(0);
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // Algorithm Preference
+  // ---------------------------------------------------------------
+
+  @Nested
+  @DisplayName("AlgorithmPreference")
+  class AlgorithmPreferenceTests {
+
+    @Test
+    @DisplayName("resolvePreset uses user SM2 algorithm when account has SM2 preference")
+    void resolvePresetUsesSm2WhenUserPrefersSm2() {
+      OwnerId user = OwnerId.generate();
+      UserAccount account =
+          UserAccount.reconstitute(
+              user,
+              "sm2user@test.com",
+              "SM2 User",
+              UserAccountStatus.ACTIVE,
+              40,
+              0.85,
+              10,
+              "en",
+              "UTC",
+              com.studydeck.domain.model.SchedulerAlgorithm.SM2,
+              Instant.EPOCH,
+              Instant.EPOCH);
+      userAccountRepo.save(account);
+
+      DeckId deck = DeckId.generate();
+      deckRepo.save(Deck.create(deck, user, "Deck", null));
+      NoteId note = NoteId.generate();
+      noteRepo.save(Note.create(note, deck, new NoteContent.Basic("Q", "A"), null));
+      CardId card = CardId.generate();
+      cardRepo.save(
+          Card.create(
+              card,
+              note,
+              NoteType.BASIC,
+              "forward",
+              0,
+              new CardPayload.BasicPrompt("Q"),
+              new CardPayload.BasicAnswer("A")));
+      scheduleRepo.save(user, card, CardScheduleState.newFsrsCard(clock.now()));
+
+      SubmitReviewUseCase.Result result =
+          sut.execute(new SubmitReviewUseCase.Command(user, card, ReviewRating.GOOD, null, null));
+
+      assertThat(result.reviewResult().nextState().scheduledDays()).isGreaterThan(0);
+    }
+
+    @Test
+    @DisplayName("Partial update: schedulerAlgorithm persists to SM2")
+    void partialUpdateSchedulerAlgorithmPersists() {
+      OwnerId user = OwnerId.generate();
+      UserAccount account =
+          UserAccount.reconstitute(
+              user,
+              "pref@test.com",
+              "User",
+              UserAccountStatus.ACTIVE,
+              40,
+              0.90,
+              10,
+              "en",
+              "UTC",
+              com.studydeck.domain.model.SchedulerAlgorithm.FSRS,
+              Instant.EPOCH,
+              Instant.EPOCH);
+      userAccountRepo.save(account);
+
+      UserPreferencesService prefSvc = new UserPreferencesService(userAccountRepo, auditPort);
+
+      prefSvc.execute(
+          new com.studydeck.domain.port.in.UpdateUserPreferencesUseCase.Command(
+              user,
+              null,
+              null,
+              null,
+              null,
+              null,
+              com.studydeck.domain.model.SchedulerAlgorithm.SM2));
+
+      UserAccount updated = userAccountRepo.findById(user).orElseThrow();
+      assertThat(updated.getSchedulerAlgorithm())
+          .isEqualTo(com.studydeck.domain.model.SchedulerAlgorithm.SM2);
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // New-cards-per-day cap
+  // ---------------------------------------------------------------
+
+  @Nested
+  @DisplayName("NewCardsPerDayCap")
+  class NewCardsPerDayCapTests {
+
+    private OwnerId capUser;
+    private DeckId capDeck;
+
+    @BeforeEach
+    void setUpCapUser() {
+      capUser = OwnerId.generate();
+      capDeck = DeckId.generate();
+      deckRepo.save(Deck.create(capDeck, capUser, "Cap Deck", null));
+    }
+
+    @Test
+    @DisplayName("Cap hit: NEW card skipped, review card served instead")
+    void capHit_newCardSkipped_reviewCardServed() {
+      UserAccount account =
+          UserAccount.reconstitute(
+              capUser,
+              "cap@test.com",
+              "Cap",
+              UserAccountStatus.ACTIVE,
+              40,
+              0.90,
+              1,
+              "en",
+              "UTC",
+              com.studydeck.domain.model.SchedulerAlgorithm.FSRS,
+              Instant.EPOCH,
+              Instant.EPOCH);
+      userAccountRepo.save(account);
+
+      // Create a NEW card
+      NoteId note1 = NoteId.generate();
+      noteRepo.save(Note.create(note1, capDeck, new NoteContent.Basic("Q1", "A1"), null));
+      CardId newCard = CardId.generate();
+      cardRepo.save(
+          Card.create(
+              newCard,
+              note1,
+              NoteType.BASIC,
+              "forward",
+              0,
+              new CardPayload.BasicPrompt("Q1"),
+              new CardPayload.BasicAnswer("A1")));
+      scheduleRepo.save(
+          capUser,
+          newCard,
+          CardScheduleState.newCard(
+              com.studydeck.domain.model.SchedulerAlgorithm.FSRS, 0.9, clock.now()));
+
+      // Create a REVIEW card (already graduated)
+      NoteId note2 = NoteId.generate();
+      noteRepo.save(Note.create(note2, capDeck, new NoteContent.Basic("Q2", "A2"), null));
+      CardId reviewCard = CardId.generate();
+      cardRepo.save(
+          Card.create(
+              reviewCard,
+              note2,
+              NoteType.BASIC,
+              "forward",
+              0,
+              new CardPayload.BasicPrompt("Q2"),
+              new CardPayload.BasicAnswer("A2")));
+      scheduleRepo.save(
+          capUser,
+          reviewCard,
+          new CardScheduleState(
+              com.studydeck.domain.model.SchedulerAlgorithm.FSRS,
+              CardState.REVIEW,
+              5.0,
+              5.0,
+              0.9,
+              1,
+              0,
+              1,
+              clock.now(),
+              clock.now().minusSeconds(86400)));
+
+      // Simulate cap hit: 1 new card was already introduced today
+      CardId alreadyIntroduced = CardId.generate();
+      logRepo.save(
+          capUser,
+          null,
+          new com.studydeck.domain.model.ReviewLog(
+              alreadyIntroduced, ReviewRating.GOOD, CardState.NEW, clock.now(), 0, 1, null));
+
+      UUID sessionId = sessionRepo.create(capUser, capDeck, 20, clock.now());
+
+      GetNextCardQuery.Query query = new GetNextCardQuery.Query(capUser, sessionId);
+      Optional<Card> result = sut.execute(query);
+
+      assertThat(result).isPresent();
+      assertThat(result.get().getId()).isEqualTo(reviewCard);
+    }
+
+    @Test
+    @DisplayName("Cap hit: returns empty when no review cards available")
+    void capHit_noReviewCards_returnsEmpty() {
+      UserAccount account =
+          UserAccount.reconstitute(
+              capUser,
+              "cap2@test.com",
+              "Cap2",
+              UserAccountStatus.ACTIVE,
+              40,
+              0.90,
+              1,
+              "en",
+              "UTC",
+              com.studydeck.domain.model.SchedulerAlgorithm.FSRS,
+              Instant.EPOCH,
+              Instant.EPOCH);
+      userAccountRepo.save(account);
+
+      // Only a NEW card
+      NoteId note1 = NoteId.generate();
+      noteRepo.save(Note.create(note1, capDeck, new NoteContent.Basic("Q1", "A1"), null));
+      CardId newCard = CardId.generate();
+      cardRepo.save(
+          Card.create(
+              newCard,
+              note1,
+              NoteType.BASIC,
+              "forward",
+              0,
+              new CardPayload.BasicPrompt("Q1"),
+              new CardPayload.BasicAnswer("A1")));
+      scheduleRepo.save(
+          capUser,
+          newCard,
+          CardScheduleState.newCard(
+              com.studydeck.domain.model.SchedulerAlgorithm.FSRS, 0.9, clock.now()));
+
+      // Cap hit: a new card was already introduced
+      CardId alreadyIntroduced = CardId.generate();
+      logRepo.save(
+          capUser,
+          null,
+          new com.studydeck.domain.model.ReviewLog(
+              alreadyIntroduced, ReviewRating.GOOD, CardState.NEW, clock.now(), 0, 1, null));
+
+      UUID sessionId = sessionRepo.create(capUser, capDeck, 20, clock.now());
+
+      GetNextCardQuery.Query query = new GetNextCardQuery.Query(capUser, sessionId);
+      Optional<Card> result = sut.execute(query);
+
+      assertThat(result).isEmpty();
+    }
+  }
+
+  // ---------------------------------------------------------------
+  // Preview Intervals
+  // ---------------------------------------------------------------
+
+  @Nested
+  @DisplayName("PreviewIntervals")
+  class PreviewIntervalsTests {
+
+    @Test
+    @DisplayName("previewIntervals returns sensible values: again <= hard <= good <= easy")
+    void previewIntervals_returnsOrderedValues() {
+      OwnerId user = OwnerId.generate();
+      UserAccount account =
+          UserAccount.reconstitute(
+              user,
+              "preview@test.com",
+              "Preview",
+              UserAccountStatus.ACTIVE,
+              40,
+              0.90,
+              10,
+              "en",
+              "UTC",
+              com.studydeck.domain.model.SchedulerAlgorithm.FSRS,
+              Instant.EPOCH,
+              Instant.EPOCH);
+      userAccountRepo.save(account);
+
+      DeckId deck = DeckId.generate();
+      deckRepo.save(Deck.create(deck, user, "Preview Deck", null));
+      NoteId note = NoteId.generate();
+      noteRepo.save(Note.create(note, deck, new NoteContent.Basic("Q", "A"), null));
+      CardId card = CardId.generate();
+      cardRepo.save(
+          Card.create(
+              card,
+              note,
+              NoteType.BASIC,
+              "forward",
+              0,
+              new CardPayload.BasicPrompt("Q"),
+              new CardPayload.BasicAnswer("A")));
+      scheduleRepo.save(user, card, CardScheduleState.newFsrsCard(clock.now()));
+
+      com.studydeck.domain.port.in.GetPreviewIntervalsQuery.PreviewIntervals intervals =
+          sut.execute(new com.studydeck.domain.port.in.GetPreviewIntervalsQuery.Query(user, card));
+
+      assertThat(intervals.again()).isGreaterThanOrEqualTo(0);
+      assertThat(intervals.hard()).isGreaterThanOrEqualTo(intervals.again());
+      assertThat(intervals.good()).isGreaterThanOrEqualTo(intervals.hard());
+      assertThat(intervals.easy()).isGreaterThanOrEqualTo(intervals.good());
     }
   }
 }

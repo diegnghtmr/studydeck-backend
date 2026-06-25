@@ -124,6 +124,31 @@ public final class InMemoryReviewLogRepository implements ReviewLogRepository {
     return (double) nonAgain / relevant.size();
   }
 
+  @Override
+  public int countNewCardsIntroducedToday(OwnerId ownerId, Instant dayStart) {
+    // Find cards whose first-ever review by this owner was on or after dayStart
+    java.util.Set<CardId> allCardIds =
+        entries.stream()
+            .filter(e -> e.ownerId().equals(ownerId))
+            .map(e -> e.log().cardId())
+            .collect(java.util.stream.Collectors.toSet());
+
+    int count = 0;
+    for (CardId cardId : allCardIds) {
+      Instant firstReview =
+          entries.stream()
+              .filter(e -> e.ownerId().equals(ownerId))
+              .filter(e -> e.log().cardId().equals(cardId))
+              .map(e -> e.log().reviewedAt())
+              .min(java.util.Comparator.naturalOrder())
+              .orElse(null);
+      if (firstReview != null && !firstReview.isBefore(dayStart)) {
+        count++;
+      }
+    }
+    return count;
+  }
+
   // Test helpers
 
   public List<ReviewLog> all() {

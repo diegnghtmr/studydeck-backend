@@ -1,6 +1,7 @@
 package com.studydeck.domain.port.in;
 
 import com.studydeck.domain.model.OwnerId;
+import com.studydeck.domain.model.SchedulerAlgorithm;
 import java.util.Objects;
 
 /** Input port — updates per-user preferences (partial PATCH semantics). */
@@ -25,6 +26,7 @@ public interface UpdateUserPreferencesUseCase {
    * @param newCardsPerDay new max new cards per day (0–999), or null to leave unchanged
    * @param language new UI language (en, es, fr, pt), or null to leave unchanged
    * @param timezone new IANA timezone string, or null to leave unchanged
+   * @param schedulerAlgorithm new SRS algorithm (FSRS or SM2), or null to leave unchanged
    */
   record Command(
       OwnerId ownerId,
@@ -32,7 +34,8 @@ public interface UpdateUserPreferencesUseCase {
       Double desiredRetention,
       Integer newCardsPerDay,
       String language,
-      String timezone) {
+      String timezone,
+      SchedulerAlgorithm schedulerAlgorithm) {
     public Command {
       Objects.requireNonNull(ownerId, "ownerId must not be null");
     }

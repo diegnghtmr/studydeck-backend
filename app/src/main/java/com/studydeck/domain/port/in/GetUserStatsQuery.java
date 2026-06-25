@@ -1,6 +1,7 @@
 package com.studydeck.domain.port.in;
 
 import com.studydeck.domain.model.OwnerId;
+import com.studydeck.domain.model.SchedulerAlgorithm;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.Objects;
@@ -28,5 +29,6 @@ public interface GetUserStatsQuery {
       double desiredRetention,
       int newCardsPerDay,
       String language,
-      String timezone) {}
+      String timezone,
+      SchedulerAlgorithm schedulerAlgorithm) {}
 }

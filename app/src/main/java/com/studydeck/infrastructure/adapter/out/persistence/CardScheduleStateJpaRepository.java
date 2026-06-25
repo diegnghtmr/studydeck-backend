@@ -73,4 +73,25 @@ interface CardScheduleStateJpaRepository extends JpaRepository<CardScheduleState
               + "AND (css.card_id IS NULL OR css.state = 'NEW')",
       nativeQuery = true)
   long countNewByDeck(@Param("ownerId") UUID ownerId, @Param("deckId") UUID deckId);
+
+  /**
+   * Finds non-NEW card IDs due for review (state != 'NEW'), optionally filtered by deck. Used when
+   * the new-cards-per-day cap is reached.
+   */
+  @Query(
+      value =
+          "SELECT css.card_id FROM card_schedule_state css "
+              + "JOIN card c ON c.id = css.card_id AND c.suspended = FALSE "
+              + "WHERE css.owner_id = :ownerId "
+              + "AND (:deckId IS NULL OR css.deck_id = :deckId) "
+              + "AND css.due_at <= :dueAt "
+              + "AND css.state != 'NEW' "
+              + "ORDER BY css.due_at ASC "
+              + "LIMIT :limit",
+      nativeQuery = true)
+  List<UUID> findDueReviewCardIds(
+      @Param("ownerId") UUID ownerId,
+      @Param("deckId") UUID deckId,
+      @Param("dueAt") Instant dueAt,
+      @Param("limit") int limit);
 }

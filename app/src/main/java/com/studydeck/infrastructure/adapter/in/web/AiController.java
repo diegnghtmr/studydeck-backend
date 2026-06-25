@@ -3,6 +3,7 @@ package com.studydeck.infrastructure.adapter.in.web;
 import com.studydeck.domain.model.AiProviderConfig;
 import com.studydeck.domain.model.OwnerId;
 import com.studydeck.domain.port.in.GenerateFlashcardsUseCase;
+import com.studydeck.domain.port.in.GetActiveUserAiProviderQuery;
 import com.studydeck.domain.port.in.ImproveFlashcardUseCase;
 import com.studydeck.domain.port.out.AiChatPort.AiChatUnavailableException;
 import com.studydeck.domain.port.out.AiSchemaValidationPort.AiOutputSchemaViolationException;
@@ -35,6 +36,11 @@ import tools.jackson.databind.node.ObjectNode;
  *
  * <p>Both endpoints validate AI output against FlashcardImportV1 JSON Schema before returning.
  * Generated cards are PROPOSALS — they are never auto-persisted.
+ *
+ * <p>The active AI provider is resolved server-side via {@link GetActiveUserAiProviderQuery}. The
+ * {@code providerOverride} request field has been removed (Domain 4 — server-side provider
+ * resolution). If no active provider is configured AND no global provider is available, the
+ * existing {@link AiChatUnavailableException} → 503 path is preserved unchanged.
  */
 @RestController
 @RequestMapping("/v1/ai")
@@ -42,14 +48,18 @@ class AiController {
 
   private final GenerateFlashcardsUseCase generateFlashcards;
   private final ImproveFlashcardUseCase improveFlashcard;
+  private final GetActiveUserAiProviderQuery getActiveUserAiProvider;
   private final ObjectMapper objectMapper;
 
   AiController(
       @Qualifier("generateFlashcardsUseCase") GenerateFlashcardsUseCase generateFlashcards,
       @Qualifier("improveFlashcardUseCase") ImproveFlashcardUseCase improveFlashcard,
+      @Qualifier("getActiveUserAiProviderQuery")
+          GetActiveUserAiProviderQuery getActiveUserAiProvider,
       ObjectMapper objectMapper) {
     this.generateFlashcards = generateFlashcards;
     this.improveFlashcard = improveFlashcard;
+    this.getActiveUserAiProvider = getActiveUserAiProvider;
     this.objectMapper = objectMapper;
   }
 
@@ -68,20 +78,8 @@ class AiController {
       throw new IllegalArgumentException("source.content is required and must not be blank");
     }
     try {
-      AiProviderConfig providerConfig = null;
-      if (request.providerOverride() != null) {
-        var dto = request.providerOverride();
-        if (dto.baseUrl() == null
-            || dto.baseUrl().isBlank()
-            || dto.apiKey() == null
-            || dto.apiKey().isBlank()
-            || dto.model() == null
-            || dto.model().isBlank()) {
-          throw new IllegalArgumentException(
-              "providerOverride requires all fields: baseUrl, apiKey, model");
-        }
-        providerConfig = new AiProviderConfig(dto.baseUrl(), dto.apiKey(), dto.model());
-      }
+      // Resolve active provider server-side (Domain 4 — no providerOverride from request body)
+      AiProviderConfig providerConfig = getActiveUserAiProvider.execute(ownerId).orElse(null);
       var cmd =
           new GenerateFlashcardsUseCase.Command(
               ownerId,
@@ -122,20 +120,8 @@ class AiController {
       throw new IllegalArgumentException("noteType and content are required");
     }
     try {
-      AiProviderConfig providerConfig = null;
-      if (request.providerOverride() != null) {
-        var dto = request.providerOverride();
-        if (dto.baseUrl() == null
-            || dto.baseUrl().isBlank()
-            || dto.apiKey() == null
-            || dto.apiKey().isBlank()
-            || dto.model() == null
-            || dto.model().isBlank()) {
-          throw new IllegalArgumentException(
-              "providerOverride requires all fields: baseUrl, apiKey, model");
-        }
-        providerConfig = new AiProviderConfig(dto.baseUrl(), dto.apiKey(), dto.model());
-      }
+      // Resolve active provider server-side (Domain 4 — no providerOverride from request body)
+      AiProviderConfig providerConfig = getActiveUserAiProvider.execute(ownerId).orElse(null);
       String contentJson = objectMapper.writeValueAsString(request.content());
       var cmd =
           new ImproveFlashcardUseCase.Command(
@@ -233,7 +219,7 @@ class AiController {
   }
 
   // ---------------------------------------------------------------
-  // Inner request records
+  // Inner request records (providerOverride REMOVED — Domain 4)
   // ---------------------------------------------------------------
 
   /** Matches the openapi {@code GenerateFlashcardsRequest} schema (nested {@code source}). */
@@ -243,20 +229,12 @@ class AiController {
       List<String> preferredTypes,
       Integer maxItems,
       String language,
-      String difficulty,
-      AiProviderConfigDto providerOverride) {
+      String difficulty) {
 
     record SourceDto(String type, String content, List<UUID> documentIds) {}
   }
 
   /** Matches the openapi {@code ImproveFlashcardRequest} schema. */
   record ImproveFlashcardRequestDto(
-      String noteType,
-      Map<String, Object> content,
-      String objective,
-      Boolean preserveMeaning,
-      AiProviderConfigDto providerOverride) {}
-
-  /** Per-request AI provider config for BYOK (Bring Your Own Key) support. */
-  record AiProviderConfigDto(String baseUrl, String apiKey, String model) {}
+      String noteType, Map<String, Object> content, String objective, Boolean preserveMeaning) {}
 }

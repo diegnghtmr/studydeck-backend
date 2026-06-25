@@ -3,6 +3,7 @@ package com.studydeck.infrastructure.adapter.in.web;
 import com.studydeck.domain.model.AiProviderConfig;
 import com.studydeck.domain.model.DocumentId;
 import com.studydeck.domain.model.OwnerId;
+import com.studydeck.domain.port.in.GetActiveUserAiProviderQuery;
 import com.studydeck.domain.port.in.RagChatUseCase;
 import com.studydeck.domain.port.in.RagSearchUseCase;
 import com.studydeck.domain.port.out.AiChatPort.AiChatUnavailableException;
@@ -27,6 +28,11 @@ import org.springframework.web.bind.annotation.RestController;
  * REST controller for RAG search and RAG chat endpoints.
  *
  * <p>Scope enforcement: rag.query
+ *
+ * <p>The active AI provider is resolved server-side via {@link GetActiveUserAiProviderQuery}. The
+ * {@code providerOverride} request field has been removed (Domain 4 — server-side provider
+ * resolution). If no active provider is configured AND no global provider is available, the
+ * existing {@link AiChatUnavailableException} → 503 path is preserved unchanged.
  */
 @RestController
 @RequestMapping("/v1/rag")
@@ -34,12 +40,16 @@ class RagController {
 
   private final RagSearchUseCase ragSearch;
   private final RagChatUseCase ragChat;
+  private final GetActiveUserAiProviderQuery getActiveUserAiProvider;
 
   RagController(
       @Qualifier("ragSearchUseCase") RagSearchUseCase ragSearch,
-      @Qualifier("ragChatUseCase") RagChatUseCase ragChat) {
+      @Qualifier("ragChatUseCase") RagChatUseCase ragChat,
+      @Qualifier("getActiveUserAiProviderQuery")
+          GetActiveUserAiProviderQuery getActiveUserAiProvider) {
     this.ragSearch = ragSearch;
     this.ragChat = ragChat;
+    this.getActiveUserAiProvider = getActiveUserAiProvider;
   }
 
   // ---------------------------------------------------------------
@@ -88,20 +98,8 @@ class RagController {
       @AuthenticationPrincipal Jwt jwt, @RequestBody RagChatRequestDto request) {
     var ownerId = ownerIdFrom(jwt);
     try {
-      AiProviderConfig providerConfig = null;
-      if (request.providerOverride() != null) {
-        var dto = request.providerOverride();
-        if (dto.baseUrl() == null
-            || dto.baseUrl().isBlank()
-            || dto.apiKey() == null
-            || dto.apiKey().isBlank()
-            || dto.model() == null
-            || dto.model().isBlank()) {
-          throw new IllegalArgumentException(
-              "providerOverride requires all fields: baseUrl, apiKey, model");
-        }
-        providerConfig = new AiProviderConfig(dto.baseUrl(), dto.apiKey(), dto.model());
-      }
+      // Resolve active provider server-side (Domain 4 — no providerOverride from request body)
+      AiProviderConfig providerConfig = getActiveUserAiProvider.execute(ownerId).orElse(null);
       var cmd =
           new RagChatUseCase.Command(
               request.message(),
@@ -155,7 +153,7 @@ class RagController {
   }
 
   // ---------------------------------------------------------------
-  // Inner request records
+  // Inner request records (providerOverride REMOVED — Domain 4)
   // ---------------------------------------------------------------
 
   record RagSearchRequest(
@@ -165,13 +163,5 @@ class RagController {
       Double minScore,
       Boolean includeContent) {}
 
-  record RagChatRequestDto(
-      String message,
-      List<UUID> documentIds,
-      Integer topK,
-      Boolean stream,
-      AiProviderConfigDto providerOverride) {}
-
-  /** Per-request AI provider config for BYOK (Bring Your Own Key) support. */
-  record AiProviderConfigDto(String baseUrl, String apiKey, String model) {}
+  record RagChatRequestDto(String message, List<UUID> documentIds, Integer topK, Boolean stream) {}
 }

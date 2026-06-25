@@ -68,6 +68,12 @@ services:
       KEYCLOAK_ADMIN_BASE_URL: http://keycloak:8080
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN:-admin}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      # DEV-ONLY THROWAWAY KEY — do NOT use in production.
+      # This is a random 32-byte Base64 value generated for local development only.
+      # Production deployments MUST set STUDYDECK_ENCRYPTION_MASTER_KEY to a secure,
+      # randomly-generated 32-byte Base64 value stored in a secrets manager.
+      # Rotating this key invalidates all stored ciphertexts (V2 rotation tooling needed).
+      STUDYDECK_ENCRYPTION_MASTER_KEY: "sdrWyR+cXTS7htBKxb01RUaozj/nt/MuPHXur0ieJTg="
     depends_on:
       postgres:
         condition: service_healthy

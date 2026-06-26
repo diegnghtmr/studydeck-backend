@@ -61,26 +61,123 @@ public class ImportSchemaValidationAdapter implements AiSchemaValidationPort {
   }
 
   /**
-   * Extracts the JSON payload from raw LLM output. Reasoning models (e.g. Qwen3) wrap their answer
-   * in {@code <think>...</think>} blocks, and some models add markdown {@code ```json} code fences
-   * or surrounding prose. This strips reasoning blocks first (they may contain stray braces), then
-   * narrows to the outermost JSON object — from the first '{' to the last '}'. Idempotent: calling
-   * it on already-clean JSON returns it unchanged.
+   * Extracts the JSON payload from raw LLM output. Reasoning models (e.g. Qwen3) interleave their
+   * answer with chain-of-thought prose — sometimes inside {@code <think>...</think>} blocks, but on
+   * sparse prompts often as UNWRAPPED prose that may contain stray braces (e.g. "the answer is
+   * {tricky}. Here: {...}"). A naive first-'{'..last-'}' window then captures that prose and fails
+   * to parse. Some models also wrap the JSON in markdown {@code ```json} code fences.
+   *
+   * <p>Strategy: strip code fences, then scan TOP-LEVEL {@code {...}} groups (balance-matched with
+   * JSON string-literal awareness so braces inside string values never count) and return the LAST
+   * group that parses as JSON. Reasoning models think FIRST and emit the answer LAST, so the final
+   * top-level object is the real payload; decoy objects they emit earlier — inside {@code <think>}
+   * blocks or as unwrapped prose, and possibly LARGER than the answer (a bare improve note is tiny)
+   * — are discarded. Prose braces that do not form valid JSON are skipped, and braces inside
+   * legitimate string values are preserved intact. Falls back to the legacy leading-{@code <think>}
+   * strip + first-'{'..last-'}' window so inputs that worked before never regress. Idempotent on
+   * already-clean JSON.
+   *
+   * <p>Known limitation: if a model emits the real answer FIRST and then a TRAILING parseable JSON
+   * object (e.g. a summary), "last wins" would pick the trailing object. This does not occur with
+   * the reasoning models we target (they think first and answer last), and the schema-violation
+   * retry re-asks the model, so it is accepted rather than worked around here.
    */
-  private static String extractJson(String raw) {
+  private String extractJson(String raw) {
     if (raw == null || raw.isBlank()) {
       return "";
     }
-    // Drop a LEADING chain-of-thought block (reasoning models emit it as the very first tokens).
-    // Anchored to the start so a literal "<think>...</think>" appearing INSIDE card content (e.g. a
-    // flashcard about reasoning tags) is never stripped.
-    String s = raw.replaceFirst("(?s)^\\s*<think>.*?</think>", "");
-    int start = s.indexOf('{');
-    int end = s.lastIndexOf('}');
-    if (start >= 0 && end > start) {
-      return s.substring(start, end + 1);
+    String s = stripCodeFences(raw);
+
+    // Balanced, string-aware scan over TOP-LEVEL '{...}' groups: the interior of a matched group is
+    // skipped (nested objects are never separate candidates). Keep the LAST group that parses as
+    // JSON — reasoning models emit decoys first and the real answer last, so the final top-level
+    // object is the payload for BOTH the large generate envelope and the small improve note.
+    String best = null;
+    int i = 0;
+    while (i < s.length()) {
+      if (s.charAt(i) != '{') {
+        i++;
+        continue;
+      }
+      int end = findMatchingBrace(s, i);
+      if (end < 0) {
+        // Unbalanced from here — advance and keep looking for a later balanced group.
+        i++;
+        continue;
+      }
+      String candidate = s.substring(i, end + 1);
+      try {
+        objectMapper.readTree(candidate);
+        best = candidate; // last parseable top-level object wins
+      } catch (Exception ignored) {
+        // Not valid JSON (e.g. a stray reasoning brace) — keep scanning.
+      }
+      i = end + 1; // skip this group's interior; only top-level objects are candidates
     }
-    return s.strip();
+    if (best != null) {
+      return best;
+    }
+
+    // Fallback: legacy behavior so previously-working inputs never regress.
+    String legacy = s.replaceFirst("(?s)^\\s*<think>.*?</think>", "");
+    int start = legacy.indexOf('{');
+    int last = legacy.lastIndexOf('}');
+    if (start >= 0 && last > start) {
+      return legacy.substring(start, last + 1);
+    }
+    return legacy.strip();
+  }
+
+  /**
+   * Returns the index of the '}' that matches the '{' at {@code openIdx}, accounting for JSON
+   * string literals (braces inside strings are ignored) and backslash escapes. Returns -1 if
+   * unbalanced.
+   */
+  private static int findMatchingBrace(String s, int openIdx) {
+    int depth = 0;
+    boolean inString = false;
+    boolean escaped = false;
+    for (int i = openIdx; i < s.length(); i++) {
+      char c = s.charAt(i);
+      if (inString) {
+        if (escaped) {
+          escaped = false;
+        } else if (c == '\\') {
+          escaped = true;
+        } else if (c == '"') {
+          inString = false;
+        }
+        continue;
+      }
+      if (c == '"') {
+        inString = true;
+      } else if (c == '{') {
+        depth++;
+      } else if (c == '}') {
+        depth--;
+        if (depth == 0) {
+          return i;
+        }
+      }
+    }
+    return -1;
+  }
+
+  /** Strips a surrounding markdown code fence ({@code ```json ... ```} or {@code ``` ... ```}). */
+  private static String stripCodeFences(String s) {
+    String t = s.strip();
+    if (!t.startsWith("```")) {
+      return t;
+    }
+    int firstNewline = t.indexOf('\n');
+    if (firstNewline >= 0) {
+      t = t.substring(firstNewline + 1);
+    }
+    int closingFence = t.lastIndexOf("```");
+    if (closingFence >= 0) {
+      t = t.substring(0, closingFence);
+    }
+    return t.strip();
   }
 
   @Override

@@ -75,10 +75,43 @@ class ImportSchemaValidationAdapterNoteTest {
           + "\"notes\":[{\"noteType\":\"basic\",\"front\":\"Q\",\"back\":\"A\"}]}";
 
   @Test
-  @DisplayName("generate: <think> reasoning block is stripped before parsing (Qwen3)")
-  void generateThinkBlockIsStripped() {
-    // The think block contains stray braces to ensure the block is REMOVED, not merely trimmed.
+  @DisplayName("generate: a <think> reasoning block before the JSON is ignored (Qwen3)")
+  void generateThinkBlockIsIgnored() {
+    // The think block holds a non-JSON brace group; the real envelope is the last parseable
+    // top-level object and wins (the block is ignored, not textually stripped from the primary
+    // path).
     String raw = "<think>I will build it. {not: real}</think>\n" + VALID_ENVELOPE;
+
+    String result = adapter.validateAndReturn(raw);
+
+    assertThat(result).isEqualTo(VALID_ENVELOPE);
+  }
+
+  @Test
+  @DisplayName("improve: a LARGE valid JSON inside <think> does NOT beat the small bare note")
+  void improveLargeValidThinkJsonDoesNotBeatNote() {
+    // Regression for the 'longest object' flaw: the reasoning JSON is far larger than the real
+    // payload. "Longest" would return the reasoning (schema fail → 3 retries exhausted); "last
+    // top-level parseable" correctly returns the small note.
+    String note = "{\"front\":\"Q\",\"back\":\"A\"}";
+    String raw =
+        "<think>{\"analysis\":\"the card is ambiguous and should be clarified\","
+            + "\"recommendation\":\"rewrite the front to be more specific and concise\","
+            + "\"confidence\":0.9}</think>"
+            + note;
+
+    String result = adapter.validateNoteAndReturn("basic", raw);
+
+    assertThat(result).isEqualTo(note);
+  }
+
+  @Test
+  @DisplayName("generate: a LARGE valid reasoning object before the envelope is ignored")
+  void generateLargeValidReasoningObjectBeforeEnvelopeIsIgnored() {
+    String raw =
+        "{\"plan\":\"outline\",\"steps\":[\"intro\",\"detail\",\"summary\"],"
+            + "\"rationale\":\"a verbose reasoning object that is longer than the envelope itself\"}\n"
+            + VALID_ENVELOPE;
 
     String result = adapter.validateAndReturn(raw);
 
@@ -122,5 +155,58 @@ class ImportSchemaValidationAdapterNoteTest {
   void blankOutputIsRejectedCleanly() {
     assertThatThrownBy(() -> adapter.validateNoteAndReturn("basic", "   "))
         .isInstanceOf(AiOutputSchemaViolationException.class);
+  }
+
+  // ---- The actual 422 bug: unwrapped reasoning prose with stray braces -------
+
+  @Test
+  @DisplayName("generate: a stray '{' in reasoning prose BEFORE the JSON is skipped, not captured")
+  void generateProseBraceBeforeJsonIsSkipped() {
+    // Reproduces the production 422: a naive first-'{'..last-'}' window would capture
+    // "{tricky}. Here:\n{envelope}" and fail to parse on the '.'. Balanced matching skips the
+    // non-JSON prose brace and finds the real envelope.
+    String raw = "Hmm, the format is {tricky}. Here:\n" + VALID_ENVELOPE;
+
+    String result = adapter.validateAndReturn(raw);
+
+    assertThat(result).isEqualTo(VALID_ENVELOPE);
+  }
+
+  @Test
+  @DisplayName("generate: trailing reasoning prose after the JSON is ignored")
+  void generateTrailingProseIsIgnored() {
+    String raw = VALID_ENVELOPE + "\n\nThat should cover the basics!";
+
+    String result = adapter.validateAndReturn(raw);
+
+    assertThat(result).isEqualTo(VALID_ENVELOPE);
+  }
+
+  @Test
+  @DisplayName("generate: a small valid decoy object in reasoning is ignored for the real envelope")
+  void generateDecoyObjectBeforeEnvelopeIsIgnored() {
+    // Reproduces the residual 422: reasoning models emit a small PARSEABLE object (e.g. the deck
+    // title) in their chain-of-thought before the full envelope. "First parseable" would grab the
+    // decoy {"title":...} (failing schema with "required property 'deck' not found"); the LAST
+    // top-level parseable object is the real envelope.
+    String raw =
+        "Let me plan the deck: {\"title\": \"Photosynthesis\"}. Now the full output:\n"
+            + VALID_ENVELOPE;
+
+    String result = adapter.validateAndReturn(raw);
+
+    assertThat(result).isEqualTo(VALID_ENVELOPE);
+  }
+
+  @Test
+  @DisplayName("generate: a '{' inside a JSON string value is preserved (string-aware matching)")
+  void generateBraceInsideStringValueIsPreserved() {
+    String envelopeWithBraceInString =
+        "{\"schemaVersion\":\"1.0\",\"deck\":{\"title\":\"Use {x} maps\"},"
+            + "\"notes\":[{\"noteType\":\"basic\",\"front\":\"What is {{c1}}?\",\"back\":\"A marker\"}]}";
+
+    String result = adapter.validateAndReturn(envelopeWithBraceInString);
+
+    assertThat(result).isEqualTo(envelopeWithBraceInString);
   }
 }

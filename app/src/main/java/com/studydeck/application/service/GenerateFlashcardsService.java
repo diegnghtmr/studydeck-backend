@@ -4,6 +4,7 @@ import com.studydeck.domain.port.in.GenerateFlashcardsUseCase;
 import com.studydeck.domain.port.out.AiChatPort;
 import com.studydeck.domain.port.out.AiSchemaValidationPort;
 import java.util.List;
+import java.util.Objects;
 
 /**
  * Application service implementing the GenerateFlashcards use case.
@@ -15,6 +16,12 @@ import java.util.List;
  * <p>Framework-free: no Spring annotations.
  */
 public final class GenerateFlashcardsService implements GenerateFlashcardsUseCase {
+
+  /**
+   * Total attempts (1 initial + retries) when the model output violates the schema. Reasoning
+   * models are non-deterministic, so re-asking usually yields conformant JSON on a later try.
+   */
+  private static final int MAX_AI_ATTEMPTS = 3;
 
   private final AiChatPort chatPort;
   private final AiSchemaValidationPort schemaValidator;
@@ -38,17 +45,26 @@ public final class GenerateFlashcardsService implements GenerateFlashcardsUseCas
             ? command.noteTypes()
             : List.of("basic");
 
-    String rawJson =
-        chatPort.generateFlashcardsRaw(
-            command.sourceText(),
-            command.deckContext(),
-            noteTypes,
-            Math.max(1, command.maxCards()),
-            command.providerConfig());
-
-    // MANDATORY: validate the LLM output against FlashcardImportV1 JSON Schema.
-    String validatedJson = schemaValidator.validateAndReturn(rawJson);
-
-    return new Result(validatedJson, true);
+    // Re-ask the model on schema violations only (non-deterministic reasoning output). Any other
+    // failure (e.g. AiChatUnavailableException) propagates immediately and is never retried.
+    AiSchemaValidationPort.AiOutputSchemaViolationException lastViolation = null;
+    for (int attempt = 1; attempt <= MAX_AI_ATTEMPTS; attempt++) {
+      String rawJson =
+          chatPort.generateFlashcardsRaw(
+              command.sourceText(),
+              command.deckContext(),
+              noteTypes,
+              Math.max(1, command.maxCards()),
+              command.providerConfig());
+      try {
+        // MANDATORY: validate the LLM output against FlashcardImportV1 JSON Schema.
+        String validatedJson = schemaValidator.validateAndReturn(rawJson);
+        return new Result(validatedJson, true);
+      } catch (AiSchemaValidationPort.AiOutputSchemaViolationException ex) {
+        lastViolation = ex;
+      }
+    }
+    throw Objects.requireNonNull(
+        lastViolation, "retry loop exited without capturing a schema violation");
   }
 }
